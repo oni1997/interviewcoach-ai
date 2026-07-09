@@ -6,6 +6,8 @@ AI-powered mock interview platform that helps job seekers prepare for technical 
 
 - Onesmus Dzidzai Maenzanise
 - Stephanie Dacullo Selanoba
+- Philip Izekor
+- Bhekimpilo Ncube
 
 ## Favorite Quote
 
