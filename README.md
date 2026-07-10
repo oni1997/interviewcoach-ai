@@ -12,3 +12,11 @@ AI-powered mock interview platform that helps job seekers prepare for technical 
 ## Favorite Quote
 
 > "Building the future starts with asking better questions." Inspired by Tony Stark
+
+
+## Stephanie Selanoba's Favorite Quote
+> "In the end, we only regret the chances we didn't take"  --Lewis Carroll
+
+
+
+
