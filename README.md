@@ -1,16 +1,18 @@
-# React + Vite
+# Interviewcoach-AI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+AI-powered mock interview platform that helps job seekers prepare for technical and behavioral interviews through AI-generated questions, personalized feedback, and interview progress tracking.
 
-Currently, two official plugins are available:
+## Team
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Onesmus Dzidzai Maenzanise
+- Stephanie Dacullo Selanoba
+- Philip Izekor
+- Bhekimpilo Ncube
 
-## React Compiler
+## Favorite Quote
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+> "Building the future starts with asking better questions." Inspired by Tony Stark
 
-## Expanding the ESLint configuration
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Stephanie Selanoba's Favorite Quote
+> "In the end, we only regret the chances we didn't take"  --Lewis Carroll
