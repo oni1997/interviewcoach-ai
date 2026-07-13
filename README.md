@@ -16,3 +16,6 @@ AI-powered mock interview platform that helps job seekers prepare for technical 
 
 ## Stephanie Selanoba's Favorite Quote
 > "In the end, we only regret the chances we didn't take"  --Lewis Carroll
+
+## Philip Izekor's Favorite Quote
+>"That which we persist in doing becomes easier, not that the task has changed, but that our ability to do it has increased"
