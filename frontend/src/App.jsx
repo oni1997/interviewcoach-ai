@@ -1,4 +1,27 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+
+// Create API instance
+const api = axios.create({ baseURL: 'http://localhost:8080/api' });
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      window.location.reload(); 
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default function App() {
   const [screen, setScreen] = useState('login');
@@ -22,74 +45,76 @@ export default function App() {
     }
   }, []);
 
-  // Countdown timer effect that activates only when inside the dashboard portal
+ // Countdown timer effect that activates only when inside the dashboard portal
   useEffect(() => {
     if (screen !== 'dashboard') {
       setTimeLeft(2700); // Reset timer if logged out
       return;
     }
-
     const timer = setInterval(() => {
       setTimeLeft((prevTime) => {
         if (prevTime <= 1) {
-          clearInterval(timer);
-          setScreen('login'); // Auto-logout when time expires
-          setError('Session expired. Please log in again.');
-          return 2700;
+        
+          handleLogout();
+          return 0;
         }
         return prevTime - 1;
       });
     }, 1000);
-
     return () => clearInterval(timer);
   }, [screen]);
 
-  // Helper function to format seconds into MM:SS format
+   // Helper function to format seconds into MM:SS format
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleRegister = (e) => {
+const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
-    if (!email || !password || !fullName) {
-      setError('Please fill out all fields.');
-      return;
+    try {
+    
+      const res = await api.post('/auth/register', { 
+        email, 
+        password, 
+        name: fullName, 
+        role 
+      });
+      setSuccess('Account created! Redirecting...');
+      setTimeout(() => {
+        setScreen('login');
+        setSuccess('');
+      }, 1800);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Registration failed. Please check your data.');
     }
-    const mockUser = { email, password, fullName, role };
-    localStorage.setItem(`user_${email}`, JSON.stringify(mockUser));
-    setSuccess('Account created successfully! Auto-redirecting to access portal...');
-    setTimeout(() => {
-      setScreen('login');
-      setPassword('');
-      setSuccess('');
-    }, 1800);
   };
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    setError('');
-    if (email === 'user@test.com' && password === 'password123') {
-      setFullName('Alex Candidate');
-      setRole('Product Manager');
+    try {
+      const res = await api.post('/auth/login', { email, password });
+      localStorage.setItem('token', res.data.token);
+      setFullName(res.data.user.name);
       setScreen('dashboard');
-      return;
+    } catch (err) {
+      setError('Invalid credentials');
     }
-    const savedUser = localStorage.getItem(`user_${email}`);
-    if (savedUser) {
-      const parsedUser = JSON.parse(savedUser);
-      if (parsedUser.password === password) {
-        setFullName(parsedUser.fullName);
-        setRole(parsedUser.role);
-        setScreen('dashboard');
-        return;
-      }
-    }
-    setError('Access Denied. Check credentials or use the designated Quick-Demo account.');
   };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setScreen('login');
+  };
+
+  // Check for existing token on load
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) setScreen('dashboard');
+  }, []);
 
   return (
     <div className="min-h-screen text-white flex flex-col justify-between font-sans relative" style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 40%, #c026d3 70%, #2563eb 100%)', minHeight: '100vh', color: '#ffffff' }}>
