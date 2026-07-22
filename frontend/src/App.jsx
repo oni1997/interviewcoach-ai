@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from './api';
+import ResumeUpload from './ResumeUpload';
 
 export default function App() {
   const [screen, setScreen] = useState('login');
@@ -421,6 +422,7 @@ export default function App() {
                     <option value="lead">Lead / Principal</option>
                   </select>
                 </div>
+
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', fontWeight: '800' }}>Skills</label>
                   <input type="text" value={profileForm.skills} onChange={(e) => setProfileForm({ ...profileForm, skills: e.target.value })} placeholder="e.g., Python, React, System Design" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} />
@@ -430,6 +432,10 @@ export default function App() {
                   <button type="button" onClick={() => setScreen('dashboard')} style={{ flex: 1, backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '16px' }}>Cancel</button>
                 </div>
               </form>
+              
+            <div style={{ marginTop: '30px', borderTop: '2px solid rgba(255,255,255,0.15)', paddingTop: '20px' }}>
+                <ResumeUpload profile={profile} onProfileUpdate={fetchDashboardData} />
+              </div>
             </div>
           </div>
         )}
