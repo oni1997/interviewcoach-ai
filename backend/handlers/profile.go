@@ -27,6 +27,7 @@ func (h *ProfileHandler) Get(c *gin.Context) {
 	).Scan(&profile.ID, &profile.UserID, &profile.Headline, &profile.Bio,
 		&profile.TargetRole, &profile.ExperienceLevel, &profile.Skills, &profile.ResumeText,
 		&profile.CreatedAt, &profile.UpdatedAt)
+
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Profile not found"})
 		return
