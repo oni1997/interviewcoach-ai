@@ -19,6 +19,7 @@ CREATE TABLE profiles (
     target_role     VARCHAR(255),
     experience_level VARCHAR(50),
     skills          TEXT,
+    resume_text       BYTEA,
     created_at      TIMESTAMP DEFAULT NOW(),
     updated_at      TIMESTAMP DEFAULT NOW()
 );
