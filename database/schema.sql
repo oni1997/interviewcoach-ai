@@ -92,3 +92,16 @@ CREATE INDEX idx_sessions_role ON interview_sessions(job_role_id);
 CREATE INDEX idx_questions_session ON interview_questions(session_id);
 CREATE INDEX idx_answers_question ON interview_answers(question_id);
 CREATE INDEX idx_feedback_answer ON interview_feedback(answer_id);
+
+-- PASSWORD RESETS
+CREATE TABLE password_resets (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token       VARCHAR(255) UNIQUE NOT NULL,
+    expires_at  TIMESTAMP NOT NULL,
+    created_at  TIMESTAMP DEFAULT NOW()
+);
+
+-- INDEXES FOR PASSWORD RESETS
+CREATE INDEX idx_password_resets_token ON password_resets(token);
+CREATE INDEX idx_password_resets_user_id ON password_resets(user_id);

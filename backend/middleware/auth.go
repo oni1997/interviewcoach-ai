@@ -51,5 +51,5 @@ func AuthRequired(cfg *config.Config) gin.HandlerFunc {
 
 		c.Set("user_id", userID)
 		c.Next()
-	}
+	}      
 }

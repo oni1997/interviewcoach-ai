@@ -50,6 +50,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 	api.POST("/ai/generate-questions", ai.GenerateQuestions)
 	api.POST("/ai/evaluate", ai.EvaluateAnswer)
+	api.POST("/auth/forgot-password", auth.ForgotPassword)
 
 	return r
 }
