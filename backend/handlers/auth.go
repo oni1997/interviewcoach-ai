@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -104,4 +105,49 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, user)
+}
+
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	var req struct {
+		Email string `json:"email" binding:"required,email"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var userID string
+	err := database.DB.QueryRow(`SELECT id FROM users WHERE email = $1`, req.Email).Scan(&userID)
+	
+	//return success even if email doesn't exist
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"message": "Password reset instructions sent to your email."})
+		return
+	}
+
+	//generate token
+	token, err := utils.GenerateResetToken()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+
+	//save token to database with an expiry
+	_, err = database.DB.Exec(
+		`INSERT INTO password_resets (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL '15 minutes')`,
+		userID, token,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
+	//send the email asynchronously and log any errors to terminal
+	go func() {
+		if err := utils.SendResetEmail(req.Email, token, h.Config); err != nil {
+			log.Printf("ERROR SENDING EMAIL: %v", err)
+		}
+	}()
+
+	c.JSON(http.StatusOK, gin.H{"message": "Password reset instructions sent to your email."})
 }

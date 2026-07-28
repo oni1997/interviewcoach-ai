@@ -23,6 +23,7 @@ export default function App() {
   const [currentSession, setCurrentSession] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
+  const [resetEmail, setResetEmail] = useState('');
 
   const [profileForm, setProfileForm] = useState({ headline: '', bio: '', target_role: '', experience_level: '', skills: '' });
 
@@ -125,6 +126,12 @@ export default function App() {
     } catch (err) {
       setError('Invalid credentials');
     }
+
+    <div style={{ textAlign: 'right', marginTop: '-10px' }}>
+  <button type="button" onClick={() => { setScreen('forgot-password'); setError(''); setSuccess(''); }} style={{ color: '#38bdf8', background: 'none', border: 'none', padding: 0, fontSize: '13px', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>
+    Forgot password?
+  </button>
+</div>
   };
 
   const handleLogout = () => {
@@ -134,6 +141,18 @@ export default function App() {
     setHistory([]);
     setStats({ total_sessions: 0, completed_sessions: 0, average_score: null });
   };
+
+  const handleForgotPassword = async (e) => {
+  e.preventDefault();
+  setError('');
+  setSuccess('');
+  try {
+    await api.post('/auth/forgot-password', { email: resetEmail });
+    setSuccess('Password reset instructions sent to your email.');
+  } catch (err) {
+    setError(err.response?.data?.error || 'Failed to process password reset.');
+  }
+};
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
@@ -235,62 +254,58 @@ export default function App() {
             <p style={{ fontSize: '11px', color: '#93c5fd', margin: 0, textTransform: 'uppercase', letterSpacing: '2px', fontWeight: '800' }}>Autonomous Assessment Platform</p>
           </div>
         </div>
-        <div style={{ fontSize: '14px', fontWeight: '900', color: '#ffffff', backgroundColor: screen === 'dashboard' ? '#ef4444' : '#3b82f6', padding: '10px 20px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.3)', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', fontFamily: 'monospace', display: 'flex', alignItems: 'center', gap: '8px', transition: 'all 0.3s ease' }}>
-          {screen === 'dashboard' ? (
-            <>⏱️ SESSION TIME: {formatTime(timeLeft)}</>
-          ) : (
-            <>👤 SESSION: WAITING</>
-          )}
-        </div>
+      
       </header>
 
       <main style={{ display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
-
-        {screen === 'login' && (
-          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '64px', maxWidth: '1100px', width: '100%' }} className="flex flex-col lg:flex-row items-center justify-center">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '28px', maxWidth: '550px', textAlign: 'left' }}>
-              <div style={{ width: '140px', height: '140px', borderRadius: '28px', backgroundColor: 'rgba(255, 255, 255, 0.15)', backdropFilter: 'blur(10px)', border: '3px solid #ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', flexShrink: 0, boxShadow: '0 15px 35px rgba(0,0,0,0.3)' }}>
-                <svg style={{ width: '80px', height: '80px', color: '#ffffff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 5h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2zM9 9h.01M15 9h.01M9 13h.01M15 13h.01M9 17h6" />
-                </svg>
-              </div>
-              <div>
-                <h2 style={{ fontSize: '40px', fontWeight: '900', color: '#ffffff', lineHeight: '1.15', margin: '0 0 12px 0', letterSpacing: '-1px', textShadow: '0 4px 15px rgba(0,0,0,0.25)' }}>AI-Powered Interview Practice for Everyone</h2>
-                <p style={{ fontSize: '18px', color: '#f3e8ff', margin: 0, lineHeight: '1.5', fontWeight: '500' }}>Log in to practice your interview performance and access custom telemetry maps.</p>
-              </div>
-            </div>
-            <div style={{ maxWidth: '460px', width: '100%' }}>
-              <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.2)', boxShadow: '0 25px 50px rgba(0,0,0,0.4)' }}>
-                <h3 style={{ fontSize: '26px', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0' }}>Initialize Session</h3>
-                <p style={{ fontSize: '14px', color: '#cbd5e1', margin: '0 0 28px 0' }}>Enter system credentials to activate standard validation metrics</p>
-                {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
-                <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', letterSpacing: '0.75px', fontWeight: '800' }}>User Identity (Email)</label>
-                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@test.com" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} required />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', letterSpacing: '0.75px', fontWeight: '800' }}>Security Cipher (Password)</label>
-                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} required />
-                  </div>
-                  <button type="submit" style={{ width: '100%', background: 'linear-gradient(to right, #2563eb, #06b6d4)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', marginTop: '10px', fontSize: '17px', boxShadow: '0 6px 20px rgba(37, 99, 235, 0.5)' }}>Authenticate Access</button>
-                </form>
-                <p style={{ fontSize: '15px', textAlign: 'center', color: '#cbd5e1', marginTop: '28px', marginBottom: 0, fontWeight: '500' }}>
-                  New evaluation candidate? <button onClick={() => { setScreen('register'); setError(''); }} style={{ color: '#38bdf8', background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer', textDecoration: 'underline', fontWeight: '700' }}>Create Account</button>
-                </p>
-              </div>
-              <div style={{ marginTop: '20px', backgroundColor: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(8px)', border: '2px solid #eab308', borderRadius: '20px', padding: '20px', boxShadow: '0 10px 20px rgba(0,0,0,0.2)' }}>
-                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                  <span style={{ backgroundColor: '#eab308', color: '#0f172a', padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '900', fontFamily: 'monospace' }}>DEMO ACCESS</span>
-                  <div style={{ fontSize: '14px', fontFamily: 'monospace', color: '#ffffff', lineHeight: '1.4' }}>
-                    <span style={{ marginRight: '16px' }}>Email: <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>user@test.com</span></span>
-                    <span>Pass: <span style={{ color: '#38bdf8', fontWeight: 'bold' }}>password123</span></span>
-                  </div>
-                </div>
-              </div>
-            </div>
+{screen === 'login' && (
+  <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '64px', maxWidth: '1100px', width: '100%' }} className="flex flex-col lg:flex-row items-center justify-center">
+    <div style={{ display: 'flex', alignItems: 'center', gap: '28px', maxWidth: '550px', textAlign: 'left' }}>
+      <div style={{ width: '140px', height: '140px', borderRadius: '28px', backgroundColor: 'rgba(255, 255, 255, 0.15)', backdropFilter: 'blur(10px)', border: '3px solid #ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', flexShrink: 0, boxShadow: '0 15px 35px rgba(0,0,0,0.3)' }}>
+        <svg style={{ width: '80px', height: '80px', color: '#ffffff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 5h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2zM9 9h.01M15 9h.01M9 13h.01M15 13h.01M9 17h6" />
+        </svg>
+      </div>
+      <div>
+        <h2 style={{ fontSize: '40px', fontWeight: '900', color: '#ffffff', lineHeight: '1.15', margin: '0 0 12px 0', letterSpacing: '-1px', textShadow: '0 4px 15px rgba(0,0,0,0.25)' }}>AI-Powered Interview Practice for Everyone</h2>
+        <p style={{ fontSize: '18px', color: '#f3e8ff', margin: 0, lineHeight: '1.5', fontWeight: '500' }}>Log in to practice your interview performance and access custom telemetry maps.</p>
+      </div>
+    </div>
+    <div style={{ maxWidth: '460px', width: '100%' }}>
+      <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.2)', boxShadow: '0 25px 50px rgba(0,0,0,0.4)' }}>
+        <h3 style={{ fontSize: '26px', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0' }}>Initialize Session</h3>
+        <p style={{ fontSize: '14px', color: '#cbd5e1', margin: '0 0 28px 0' }}>Enter system credentials to activate standard validation metrics</p>
+        {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', letterSpacing: '0.75px', fontWeight: '800' }}>User Identity (Email)</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@test.com" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} required />
           </div>
-        )}
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', letterSpacing: '0.75px', fontWeight: '800' }}>Security Cipher (Password)</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} required />
+          </div>
+          
+          <div style={{ textAlign: 'right', marginTop: '-10px', marginBottom: '-5px' }}>
+            <button 
+              type="button" 
+              onClick={() => { setScreen('forgot-password'); setError(''); setSuccess(''); }} 
+              style={{ color: '#38bdf8', background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer', fontSize: '14px', fontWeight: '700' }}
+            >
+              Forgot password?
+            </button>
+          </div>
+
+          <button type="submit" style={{ width: '100%', background: 'linear-gradient(to right, #2563eb, #06b6d4)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', marginTop: '10px', fontSize: '17px', boxShadow: '0 6px 20px rgba(37, 99, 235, 0.5)' }}>Authenticate Access</button>
+        </form>
+        <p style={{ fontSize: '15px', textAlign: 'center', color: '#cbd5e1', marginTop: '28px', marginBottom: 0, fontWeight: '500' }}>
+          New evaluation candidate? <button onClick={() => { setScreen('register'); setError(''); }} style={{ color: '#38bdf8', background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer', textDecoration: 'underline', fontWeight: '700' }}>Create Account</button>
+        </p>
+      </div>
+    </div>
+  </div>
+)}
+
 
         {screen === 'register' && (
           <div style={{ maxWidth: '460px', width: '100%' }}>
@@ -511,6 +526,30 @@ export default function App() {
                 <button onClick={submitInterview} style={{ flex: 1, background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)' }}>Submit Answers</button>
                 <button onClick={() => { setScreen('dashboard'); setCurrentSession(null); setQuestions([]); setAnswers({}); }} style={{ flex: 1, backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '16px' }}>Cancel</button>
               </div>
+            </div>
+          </div>
+        )}
+
+
+        {screen === 'forgot-password' && (
+          <div style={{ maxWidth: '460px', width: '100%' }}>
+            <div style={{ backgroundColor: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.2)', boxShadow: '0 25px 50px rgba(0,0,0,0.4)' }}>
+              <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', textAlign: 'center', margin: '0 0 6px 0' }}>Reset Password</h2>
+              <p style={{ fontSize: '15px', color: '#cbd5e1', textAlign: 'center', margin: '0 0 28px 0' }}>Enter your account email to receive recovery instructions</p>
+              {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
+              {success && <div style={{ backgroundColor: '#10b981', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{success}</div>}
+              
+              <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', fontWeight: '800' }}>System Email Account</label>
+                  <input type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} placeholder="name@domain.com" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} required />
+                </div>
+                <button type="submit" style={{ width: '100%', background: 'linear-gradient(to right, #2563eb, #06b6d4)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', marginTop: '10px', fontSize: '16px', boxShadow: '0 6px 20px rgba(37, 99, 235, 0.5)' }}>Send Reset Link</button>
+              </form>
+
+              <p style={{ fontSize: '15px', textAlign: 'center', color: '#cbd5e1', marginTop: '28px', marginBottom: 0, fontWeight: '500' }}>
+                Remembered your password? <button onClick={() => { setScreen('login'); setError(''); setSuccess(''); }} style={{ color: '#38bdf8', background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer', textDecoration: 'underline', fontWeight: '700' }}>Return to Login</button>
+              </p>
             </div>
           </div>
         )}
