@@ -37,7 +37,7 @@ export default function DarkModeToggle() {
         </>
       ) : (
         <>
-          <span>🌙</span> Dark
+          <span>🌒</span> Dark
         </>
       )}
     </button>

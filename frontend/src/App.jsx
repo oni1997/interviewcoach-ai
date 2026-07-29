@@ -27,6 +27,7 @@ export default function App() {
   const [resetEmail, setResetEmail] = useState('');
 
   const [profileForm, setProfileForm] = useState({ headline: '', bio: '', target_role: '', experience_level: '', skills: '' });
+  const [isDarkMode, setIsDarkMode] = React.useState(false);
 
   useEffect(() => {
     if (!document.getElementById('tailwind-cdn-fallback')) {
@@ -242,7 +243,7 @@ export default function App() {
 
 return (
     <div id="app-root-container" className="min-h-screen text-white flex flex-col justify-between font-sans relative" style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 40%, #c026d3 70%, #2563eb 100%)', minHeight: '100vh', color: '#ffffff' }}>
-      <header className="p-5 flex justify-between items-center" style={{ backgroundColor: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(16px)', borderBottom: '2px solid rgba(255, 255, 255, 0.15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <header className="p-5 flex justify-between items-center" style={{ backgroundColor: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(16px)', borderBottom: '2px solid rgba(255, 255, 255, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ backgroundColor: '#06b6d4', padding: '10px', borderRadius: '14px', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(6, 182, 212, 0.6)' }}>
             <svg style={{ width: '28px', height: '28px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -255,11 +256,9 @@ return (
           </div>
         </div>
 
-
         <div>
           <DarkModeToggle />
         </div>
-
       </header>
 
       <main style={{ display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
@@ -277,7 +276,7 @@ return (
               </div>
             </div>
             <div style={{ maxWidth: '460px', width: '100%' }}>
-              <div className="app-card-box" style={{ backgroundColor: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.2)', boxShadow: '0 25px 50px rgba(0,0,0,0.4)' }}>
+              <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
                 <h3 style={{ fontSize: '26px', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0' }}>Initialize Session</h3>
                 <p style={{ fontSize: '14px', color: '#cbd5e1', margin: '0 0 28px 0' }}>Enter system credentials to activate standard validation metrics</p>
                 {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
@@ -301,7 +300,7 @@ return (
                     </button>
                   </div>
 
-                  <button type="submit" style={{ width: '100%', background: 'linear-gradient(to right, #2563eb, #06b6d4)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', marginTop: '10px', fontSize: '17px', boxShadow: '0 6px 20px rgba(37, 99, 235, 0.5)' }}>Authenticate Access</button>
+                  <button type="submit" style={{ width: '100%', background: 'linear-gradient(to right, #2563eb, #06b6d4)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', marginTop: '10px', fontSize: '17px', boxShadow: '0 6px 20px rgba(37, 99, 235, 0.5)' }}>Authenticate Access</button>
                 </form>
                 <p style={{ fontSize: '15px', textAlign: 'center', color: '#cbd5e1', marginTop: '28px', marginBottom: 0, fontWeight: '500' }}>
                   New evaluation candidate? <button onClick={() => { setScreen('register'); setError(''); }} style={{ color: '#38bdf8', background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer', textDecoration: 'underline', fontWeight: '700' }}>Create Account</button>
@@ -311,10 +310,9 @@ return (
           </div>
         )}
 
-
         {screen === 'register' && (
           <div style={{ maxWidth: '460px', width: '100%' }}>
-            <div className="app-card-box" style={{ backgroundColor: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.2)', boxShadow: '0 25px 50px rgba(0,0,0,0.4)' }}>
+            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', textAlign: 'center', margin: '0 0 6px 0' }}>Provision Profile</h2>
               <p style={{ fontSize: '15px', color: '#cbd5e1', textAlign: 'center', margin: '0 0 28px 0' }}>Register metrics to the evaluation network</p>
               {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
@@ -340,7 +338,7 @@ return (
                   <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', fontWeight: '800' }}>Access Password</label>
                   <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} required />
                 </div>
-                <button type="submit" style={{ width: '100%', background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', marginTop: '10px', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)' }}>Create Account</button>
+                <button type="submit" style={{ width: '100%', background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', marginTop: '10px', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)' }}>Create Account</button>
               </form>
               <p style={{ fontSize: '15px', textAlign: 'center', color: '#cbd5e1', marginTop: '28px', marginBottom: 0, fontWeight: '500' }}>
                 Already registered? <button onClick={() => { setScreen('login'); setError(''); }} style={{ color: '#6ee7b7', background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer', textDecoration: 'underline', fontWeight: '700' }}>Return to Verification</button>
@@ -350,8 +348,8 @@ return (
         )}
 
         {screen === 'dashboard' && (
-          <div className="app-card-box" style={{ width: '100%', maxWidth: '1000px', backgroundColor: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(20px)', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.2)', padding: '40px', boxShadow: '0 25px 60px rgba(0,0,0,0.4)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid rgba(255,255,255,0.15)', paddingBottom: '28px', marginBottom: '40px' }}>
+          <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ width: '100%', maxWidth: '1000px', backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', padding: '40px', boxShadow: '0 25px 60px rgba(0,0,0,0.6)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid rgba(255,255,255,0.25)', paddingBottom: '28px', marginBottom: '40px' }}>
               <div>
                 <p style={{ fontSize: '13px', fontFamily: 'monospace', color: '#cbd5e1', fontWeight: '900', textTransform: 'uppercase', margin: '0 0 6px 0', letterSpacing: '1.5px' }}>Interactive Coaching Matrix Active</p>
                 <h2 style={{ fontSize: '42px', fontWeight: '900', color: '#ffffff', margin: 0, letterSpacing: '-0.5px', textShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>Welcome, {fullName}!</h2>
@@ -361,22 +359,22 @@ return (
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => { setScreen('profile'); setError(''); setSuccess(''); }} style={{ backgroundColor: '#8b5cf6', color: '#ffffff', fontWeight: '800', padding: '14px 28px', borderRadius: '14px', fontSize: '14px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', boxShadow: '0 4px 14px rgba(139,92,246,0.4)' }}>Profile</button>
-                <button onClick={() => { setScreen('history'); setError(''); }} style={{ backgroundColor: '#3b82f6', color: '#ffffff', fontWeight: '800', padding: '14px 28px', borderRadius: '14px', fontSize: '14px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', boxShadow: '0 4px 14px rgba(59,130,246,0.4)' }}>History</button>
-                <button onClick={handleLogout} style={{ backgroundColor: '#ef4444', color: '#ffffff', fontWeight: '800', padding: '14px 28px', borderRadius: '14px', fontSize: '14px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', boxShadow: '0 4px 14px rgba(239,68,68,0.4)' }}>Logout</button>
+                <button onClick={() => { setScreen('profile'); setError(''); setSuccess(''); }} style={{ backgroundColor: '#8b5cf6', color: '#ffffff', fontWeight: '800', padding: '14px 28px', borderRadius: '14px', fontSize: '14px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', boxShadow: '0 4px 14px rgba(139,92,246,0.4)' }}>Profile</button>
+                <button onClick={() => { setScreen('history'); setError(''); }} style={{ backgroundColor: '#3b82f6', color: '#ffffff', fontWeight: '800', padding: '14px 28px', borderRadius: '14px', fontSize: '14px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', boxShadow: '0 4px 14px rgba(59,130,246,0.4)' }}>History</button>
+                <button onClick={handleLogout} style={{ backgroundColor: '#ef4444', color: '#ffffff', fontWeight: '800', padding: '14px 28px', borderRadius: '14px', fontSize: '14px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', boxShadow: '0 4px 14px rgba(239,68,68,0.4)' }}>Logout</button>
               </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '32px' }}>
-              <div style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
+              <div style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', textAlign: 'center' }}>
                 <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0 0 8px 0', fontWeight: '700' }}>Total Sessions</p>
                 <p style={{ fontSize: '36px', fontWeight: '900', color: '#3b82f6', margin: 0 }}>{stats.total_sessions}</p>
               </div>
-              <div style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
+              <div style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', textAlign: 'center' }}>
                 <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0 0 8px 0', fontWeight: '700' }}>Completed</p>
                 <p style={{ fontSize: '36px', fontWeight: '900', color: '#10b981', margin: 0 }}>{stats.completed_sessions}</p>
               </div>
-              <div style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
+              <div style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', textAlign: 'center' }}>
                 <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0 0 8px 0', fontWeight: '700' }}>Avg Score</p>
                 <p style={{ fontSize: '36px', fontWeight: '900', color: '#eab308', margin: 0 }}>{stats.average_score ? Number(stats.average_score).toFixed(1) : '—'}</p>
               </div>
@@ -385,28 +383,28 @@ return (
             {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '28px' }}>
-              <div onClick={() => startInterview('behavioral')} style={{ backgroundColor: '#0f172a', padding: '32px', borderRadius: '20px', border: '2px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 10px 20px rgba(0,0,0,0.2)', cursor: 'pointer', transition: 'transform 0.2s' }}>
+              <div onClick={() => startInterview('behavioral')} style={{ backgroundColor: '#0f172a', padding: '32px', borderRadius: '20px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', cursor: 'pointer', transition: 'transform 0.2s' }}>
                 <div>
                   <h4 style={{ fontWeight: '900', color: '#ffffff', fontSize: '20px', margin: '0 0 10px 0' }}>Behavioral Matrix</h4>
                   <p style={{ fontSize: '15px', color: '#e2e8f0', margin: 0, lineHeight: '1.6', fontWeight: '500' }}>Dynamic evaluation mapping answers onto precise core evaluation criteria metrics.</p>
                 </div>
-                <div style={{ marginTop: '32px', textAlign: 'center', fontSize: '14px', fontWeight: '900', color: '#ffffff', backgroundColor: '#4f46e5', padding: '12px', borderRadius: '10px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.3)' }}>START SESSION →</div>
+                <div style={{ marginTop: '32px', textAlign: 'center', fontSize: '14px', fontWeight: '900', color: '#ffffff', backgroundColor: '#4f46e5', padding: '12px', borderRadius: '10px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.4)' }}>START SESSION →</div>
               </div>
 
-              <div onClick={() => startInterview('technical')} style={{ backgroundColor: '#0f172a', padding: '32px', borderRadius: '20px', border: '2px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 10px 20px rgba(0,0,0,0.2)', cursor: 'pointer', transition: 'transform 0.2s' }}>
+              <div onClick={() => startInterview('technical')} style={{ backgroundColor: '#0f172a', padding: '32px', borderRadius: '20px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', cursor: 'pointer', transition: 'transform 0.2s' }}>
                 <div>
                   <h4 style={{ fontWeight: '900', color: '#ffffff', fontSize: '20px', margin: '0 0 10px 0' }}>Technical Workspace</h4>
                   <p style={{ fontSize: '15px', color: '#e2e8f0', margin: 0, lineHeight: '1.6', fontWeight: '500' }}>Interactive architectural coding environments and execution tracking scripts.</p>
                 </div>
-                <div style={{ marginTop: '32px', textAlign: 'center', fontSize: '14px', fontWeight: '900', color: '#ffffff', backgroundColor: '#06b6d4', padding: '12px', borderRadius: '10px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.3)' }}>START SESSION →</div>
+                <div style={{ marginTop: '32px', textAlign: 'center', fontSize: '14px', fontWeight: '900', color: '#ffffff', backgroundColor: '#06b6d4', padding: '12px', borderRadius: '10px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.4)' }}>START SESSION →</div>
               </div>
 
-              <div style={{ backgroundColor: '#0f172a', padding: '32px', borderRadius: '20px', border: '2px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 10px 20px rgba(0,0,0,0.2)' }}>
+              <div style={{ backgroundColor: '#0f172a', padding: '32px', borderRadius: '20px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 10px 20px rgba(0,0,0,0.3)' }}>
                 <div>
                   <h4 style={{ fontWeight: '900', color: '#ffffff', fontSize: '20px', margin: '0 0 10px 0' }}>Vocal AI Simulation</h4>
                   <p style={{ fontSize: '15px', color: '#e2e8f0', margin: 0, lineHeight: '1.6', fontWeight: '500' }}>Speech-to-text validation engines analyzing cadence and presentation timelines.</p>
                 </div>
-                <div style={{ marginTop: '32px', textAlign: 'center', fontSize: '12px', fontWeight: '900', color: '#ffffff', backgroundColor: '#10b981', padding: '10px', borderRadius: '10px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.3)' }}>PIPELINE LOCKED</div>
+                <div style={{ marginTop: '32px', textAlign: 'center', fontSize: '12px', fontWeight: '900', color: '#ffffff', backgroundColor: '#10b981', padding: '10px', borderRadius: '10px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.4)' }}>PIPELINE LOCKED</div>
               </div>
             </div>
           </div>
@@ -414,7 +412,7 @@ return (
 
         {screen === 'profile' && (
           <div style={{ maxWidth: '600px', width: '100%' }}>
-            <div className="app-card-box" style={{ backgroundColor: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.2)', boxShadow: '0 25px 50px rgba(0,0,0,0.4)' }}>
+            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0' }}>Edit Profile</h2>
               <p style={{ fontSize: '15px', color: '#cbd5e1', margin: '0 0 28px 0' }}>Update your interview profile information</p>
               {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
@@ -448,12 +446,12 @@ return (
                   <input type="text" value={profileForm.skills} onChange={(e) => setProfileForm({ ...profileForm, skills: e.target.value })} placeholder="e.g., Python, React, System Design" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} />
                 </div>
                 <div style={{ display: 'flex', gap: '12px' }}>
-                  <button type="submit" style={{ flex: 1, background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)' }}>Save Profile</button>
-                  <button type="button" onClick={() => setScreen('dashboard')} style={{ flex: 1, backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '16px' }}>Cancel</button>
+                  <button type="submit" style={{ flex: 1, background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)' }}>Save Profile</button>
+                  <button type="button" onClick={() => setScreen('dashboard')} style={{ flex: 1, backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>Cancel</button>
                 </div>
               </form>
 
-              <div style={{ marginTop: '30px', borderTop: '2px solid rgba(255,255,255,0.15)', paddingTop: '20px' }}>
+              <div style={{ marginTop: '30px', borderTop: '2px solid rgba(255,255,255,0.25)', paddingTop: '20px' }}>
                 <ResumeUpload profile={profile} onProfileUpdate={fetchDashboardData} />
               </div>
             </div>
@@ -462,14 +460,14 @@ return (
 
         {screen === 'history' && (
           <div style={{ width: '100%', maxWidth: '800px' }}>
-            <div className="app-card-box" style={{ backgroundColor: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.2)', boxShadow: '0 25px 50px rgba(0,0,0,0.4)' }}>
+            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', margin: '0 0 28px 0' }}>Interview History</h2>
               {history.length === 0 ? (
                 <p style={{ color: '#94a3b8', textAlign: 'center', fontSize: '16px' }}>No interview sessions yet. Start one from the dashboard!</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {history.map((session) => (
-                    <div key={session.id} style={{ backgroundColor: '#0f172a', padding: '20px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div key={session.id} style={{ backgroundColor: '#0f172a', padding: '20px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <p style={{ fontSize: '16px', fontWeight: '700', color: '#ffffff', margin: '0 0 4px 0' }}>{session.role_title || 'Unknown Role'}</p>
                         <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0, fontFamily: 'monospace' }}>
@@ -486,27 +484,27 @@ return (
                   ))}
                 </div>
               )}
-              <button onClick={() => setScreen('dashboard')} style={{ width: '100%', marginTop: '24px', backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '16px' }}>Back to Dashboard</button>
+              <button onClick={() => setScreen('dashboard')} style={{ width: '100%', marginTop: '24px', backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>Back to Dashboard</button>
             </div>
           </div>
         )}
 
         {screen === 'interview-setup' && (
           <div style={{ maxWidth: '500px', width: '100%' }}>
-            <div className="app-card-box" style={{ backgroundColor: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.2)', boxShadow: '0 25px 50px rgba(0,0,0,0.4)' }}>
+            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0' }}>New {selectedType === 'technical' ? 'Technical' : 'Behavioral'} Interview</h2>
               <p style={{ fontSize: '15px', color: '#cbd5e1', margin: '0 0 28px 0' }}>Select a job role for this session</p>
               {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '28px', maxHeight: '300px', overflowY: 'auto' }}>
                 {jobRoles.map((r) => (
-                  <button key={r.id} onClick={() => setSelectedRole(r.id)} style={{ textAlign: 'left', padding: '16px', borderRadius: '14px', border: selectedRole === r.id ? '2px solid #06b6d4' : '2px solid rgba(255,255,255,0.1)', backgroundColor: selectedRole === r.id ? 'rgba(6, 182, 212, 0.2)' : '#0f172a', color: '#ffffff', cursor: 'pointer', fontWeight: '700', fontSize: '15px' }}>
+                  <button key={r.id} onClick={() => setSelectedRole(r.id)} style={{ textAlign: 'left', padding: '16px', borderRadius: '14px', border: selectedRole === r.id ? '2px solid #06b6d4' : '2px solid rgba(255,255,255,0.2)', backgroundColor: selectedRole === r.id ? 'rgba(6, 182, 212, 0.25)' : '#0f172a', color: '#ffffff', cursor: 'pointer', fontWeight: '700', fontSize: '15px' }}>
                     {r.title} <span style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '500' }}>· {r.category}</span>
                   </button>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: '12px' }}>
-                <button onClick={createSession} disabled={!selectedRole} style={{ flex: 1, background: selectedRole ? 'linear-gradient(to right, #2563eb, #06b6d4)' : '#475569', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.3)', cursor: selectedRole ? 'pointer' : 'not-allowed', fontSize: '16px', boxShadow: selectedRole ? '0 6px 20px rgba(37, 99, 235, 0.5)' : 'none' }}>Start Interview</button>
-                <button onClick={() => { setScreen('dashboard'); setSelectedRole(null); }} style={{ flex: 1, backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '16px' }}>Cancel</button>
+                <button onClick={createSession} disabled={!selectedRole} style={{ flex: 1, background: selectedRole ? 'linear-gradient(to right, #2563eb, #06b6d4)' : '#475569', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: selectedRole ? 'pointer' : 'not-allowed', fontSize: '16px', boxShadow: selectedRole ? '0 6px 20px rgba(37, 99, 235, 0.5)' : 'none' }}>Start Interview</button>
+                <button onClick={() => { setScreen('dashboard'); setSelectedRole(null); }} style={{ flex: 1, backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>Cancel</button>
               </div>
             </div>
           </div>
@@ -514,13 +512,13 @@ return (
 
         {screen === 'interview' && (
           <div style={{ width: '100%', maxWidth: '800px' }}>
-            <div className="app-card-box" style={{ backgroundColor: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.2)', boxShadow: '0 25px 50px rgba(0,0,0,0.4)' }}>
+            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0' }}>{selectedType === 'technical' ? 'Technical' : 'Behavioral'} Interview</h2>
               <p style={{ fontSize: '15px', color: '#cbd5e1', margin: '0 0 28px 0' }}>Answer each question below, then submit when ready.</p>
               {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 {questions.map((q, idx) => (
-                  <div key={q.id} style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.1)' }}>
+                  <div key={q.id} style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)' }}>
                     <p style={{ fontSize: '16px', fontWeight: '800', color: '#38bdf8', margin: '0 0 8px 0', fontFamily: 'monospace' }}>QUESTION {idx + 1}</p>
                     <p style={{ fontSize: '17px', fontWeight: '600', color: '#ffffff', margin: '0 0 16px 0', lineHeight: '1.5' }}>{q.question_text}</p>
                     <textarea value={answers[q.id] || ''} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} placeholder="Type your answer here..." rows={4} style={{ width: '100%', backgroundColor: '#1e293b', border: '2px solid #475569', borderRadius: '12px', padding: '14px', color: '#ffffff', fontSize: '15px', fontWeight: '500', resize: 'vertical' }} />
@@ -528,8 +526,8 @@ return (
                 ))}
               </div>
               <div style={{ display: 'flex', gap: '12px', marginTop: '28px' }}>
-                <button onClick={submitInterview} style={{ flex: 1, background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)' }}>Submit Answers</button>
-                <button onClick={() => setScreen('dashboard')} style={{ backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px 24px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '16px' }}>Cancel</button>
+                <button onClick={submitInterview} style={{ flex: 1, background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)' }}>Submit Answers</button>
+                <button onClick={() => setScreen('dashboard')} style={{ backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px 24px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>Cancel</button>
               </div>
             </div>
           </div>
@@ -537,7 +535,7 @@ return (
 
         {screen === 'forgot-password' && (
           <div style={{ maxWidth: '460px', width: '100%' }}>
-            <div className="app-card-box" style={{ backgroundColor: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.2)', boxShadow: '0 25px 50px rgba(0,0,0,0.4)' }}>
+            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', textAlign: 'center', margin: '0 0 6px 0' }}>Reset Password</h2>
               <p style={{ fontSize: '15px', color: '#cbd5e1', textAlign: 'center', margin: '0 0 28px 0' }}>Enter your account email to receive recovery instructions</p>
               {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
@@ -548,7 +546,7 @@ return (
                   <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', fontWeight: '800' }}>System Email Account</label>
                   <input type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} placeholder="name@domain.com" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} required />
                 </div>
-                <button type="submit" style={{ width: '100%', background: 'linear-gradient(to right, #2563eb, #06b6d4)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', marginTop: '10px', fontSize: '16px', boxShadow: '0 6px 20px rgba(37, 99, 235, 0.5)' }}>Send Reset Link</button>
+                <button type="submit" style={{ width: '100%', background: 'linear-gradient(to right, #2563eb, #06b6d4)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', marginTop: '10px', fontSize: '16px', boxShadow: '0 6px 20px rgba(37, 99, 235, 0.5)' }}>Send Reset Link</button>
               </form>
 
               <p style={{ fontSize: '15px', textAlign: 'center', color: '#cbd5e1', marginTop: '28px', marginBottom: 0, fontWeight: '500' }}>
@@ -560,7 +558,7 @@ return (
 
       </main>
 
-      <footer style={{ textAlign: 'center', padding: '24px 16px', borderTop: '2px solid rgba(255,255,255,0.15)', color: '#ffffff', fontSize: '15px', fontFamily: 'monospace', backgroundColor: '#0f172a', letterSpacing: '0.5px', fontWeight: '700' }}>
+      <footer style={{ textAlign: 'center', padding: '24px 16px', borderTop: '2px solid rgba(255,255,255,0.25)', color: '#ffffff', fontSize: '15px', fontFamily: 'monospace', backgroundColor: '#0f172a', letterSpacing: '0.5px', fontWeight: '700' }}>
         &copy; {new Date().getFullYear()} InterviewCoach AI
       </footer>
     </div>
