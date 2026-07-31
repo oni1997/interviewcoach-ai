@@ -52,6 +52,16 @@ func (h *AIHandler) hasOpenAI() bool {
 	return h.Config != nil && h.Config.AIKey != ""
 }
 
+func (h *AIHandler) hasNVIDIA() bool {
+	return h.Config != nil && h.Config.NVIDIA_API_KEY != ""
+}
+
+func (h *AIHandler) nvidiaClient() *openai.Client {
+	cfg := openai.DefaultConfig(h.Config.NVIDIA_API_KEY)
+	cfg.BaseURL = "https://integrate.api.nvidia.com/v1"
+	return openai.NewClientWithConfig(cfg)
+}
+
 func (h *AIHandler) GenerateQuestions(c *gin.Context) {
 	var req GenerateQuestionsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -114,7 +124,17 @@ func (h *AIHandler) GenerateQuestions(c *gin.Context) {
 		fmt.Printf("⚠️  OpenAI question generation failed, falling back: %v\n", err)
 	}
 
-	// 3) Local fallback
+	// 3) NVIDIA fallback
+	if h.hasNVIDIA() {
+		questions, err := h.generateWithNVIDIA(role, interviewType, count)
+		if err == nil {
+			c.JSON(http.StatusOK, gin.H{"questions": questions, "source": "nvidia"})
+			return
+		}
+		fmt.Printf("⚠️  NVIDIA question generation failed, falling back: %v\n", err)
+	}
+
+	// 4) Local fallback
 	c.JSON(http.StatusOK, gin.H{"questions": h.fallbackQuestions(role, interviewType, count), "source": "fallback"})
 }
 
@@ -161,7 +181,18 @@ func (h *AIHandler) EvaluateAnswer(c *gin.Context) {
 		fmt.Printf("⚠️  OpenAI evaluation failed, falling back: %v\n", err)
 	}
 
-	// 3) Local heuristic fallback
+	// 3) NVIDIA fallback
+	if h.hasNVIDIA() {
+		result, err := h.evaluateWithNVIDIA(req.Question, answer, role)
+		if err == nil {
+			result["source"] = "nvidia"
+			c.JSON(http.StatusOK, result)
+			return
+		}
+		fmt.Printf("⚠️  NVIDIA evaluation failed, falling back: %v\n", err)
+	}
+
+	// 4) Local heuristic fallback
 	score := h.fallbackScore(answer)
 	c.JSON(http.StatusOK, gin.H{
 		"score":      score * 10,
@@ -262,7 +293,19 @@ func (h *AIHandler) ScoreAnswers(c *gin.Context) {
 		fmt.Printf("⚠️  OpenAI scoring failed, falling back: %v\n", err)
 	}
 
-	// 3) Local heuristic fallback
+	// 3) NVIDIA fallback
+	if h.hasNVIDIA() {
+		scored, err := h.scoreWithNVIDIA(req)
+		if err == nil {
+			scoredAnswers = scored
+			h.persistScoredAnswers(scoredAnswers, sessionID, &overallScore)
+			c.JSON(http.StatusOK, gin.H{"scored_answers": scoredAnswers, "overall_score": overallScore, "source": "nvidia"})
+			return
+		}
+		fmt.Printf("⚠️  NVIDIA scoring failed, falling back: %v\n", err)
+	}
+
+	// 4) Local heuristic fallback
 	for _, item := range req.Items {
 		score := h.fallbackScore(item.Answer)
 		feedback := fmt.Sprintf("Good effort on this %s question. Consider providing more specific examples.", req.InterviewType)
@@ -283,6 +326,75 @@ func (h *AIHandler) scoreWithOpenAI(req ScoreAnswersRequest) ([]services.ScoredA
 	prompt := h.buildScorePrompt(req.JobRole, req.InterviewType, req.Items)
 	resp, err := client.CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
 		Model: openai.GPT4oMini,
+		Messages: []openai.ChatCompletionMessage{
+			{Role: openai.ChatMessageRoleSystem, Content: "You are an expert interview evaluator. Score interview answers on a scale of 1-10. Return a JSON array with objects containing: question_id (string), score (number 1-10), feedback (string), strengths (string), improvements (string). Return ONLY the JSON array."},
+			{Role: openai.ChatMessageRoleUser, Content: prompt},
+		},
+		Temperature: 0.3,
+		MaxTokens:   2000,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var scored []services.ScoredAnswer
+	if err := json.Unmarshal([]byte(cleanAIJSON(resp.Choices[0].Message.Content)), &scored); err != nil {
+		return nil, err
+	}
+	return scored, nil
+}
+
+func (h *AIHandler) generateWithNVIDIA(jobRole, interviewType string, num int) ([]string, error) {
+	prompt := h.buildQuestionPrompt(jobRole, interviewType, num)
+	client := h.nvidiaClient()
+	resp, err := client.CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
+		Model: h.Config.NVIDIA_MODEL,
+		Messages: []openai.ChatCompletionMessage{
+			{Role: openai.ChatMessageRoleSystem, Content: "You are an expert interview coach. Generate realistic interview questions. Return ONLY a JSON array of strings, no markdown, no explanation."},
+			{Role: openai.ChatMessageRoleUser, Content: prompt},
+		},
+		Temperature: 0.7,
+		MaxTokens:   1000,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	content := cleanAIJSON(resp.Choices[0].Message.Content)
+	var questions []string
+	if err := json.Unmarshal([]byte(content), &questions); err != nil {
+		return nil, err
+	}
+	return questions, nil
+}
+
+func (h *AIHandler) evaluateWithNVIDIA(question, answer, role string) (map[string]interface{}, error) {
+	client := h.nvidiaClient()
+	resp, err := client.CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
+		Model: h.Config.NVIDIA_MODEL,
+		Messages: []openai.ChatCompletionMessage{
+			{Role: openai.ChatMessageRoleSystem, Content: "You are a senior technical interviewer. Evaluate the candidate's answer for the given question. Return ONLY a JSON object with keys: score (0-100), feedback, strengths (array of strings), weaknesses (array of strings)."},
+			{Role: openai.ChatMessageRoleUser, Content: fmt.Sprintf("Role: %s\nQuestion: %s\nAnswer: %s", role, question, answer)},
+		},
+		Temperature: 0.3,
+		MaxTokens:   1000,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(cleanAIJSON(resp.Choices[0].Message.Content)), &result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (h *AIHandler) scoreWithNVIDIA(req ScoreAnswersRequest) ([]services.ScoredAnswer, error) {
+	client := h.nvidiaClient()
+	prompt := h.buildScorePrompt(req.JobRole, req.InterviewType, req.Items)
+	resp, err := client.CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
+		Model: h.Config.NVIDIA_MODEL,
 		Messages: []openai.ChatCompletionMessage{
 			{Role: openai.ChatMessageRoleSystem, Content: "You are an expert interview evaluator. Score interview answers on a scale of 1-10. Return a JSON array with objects containing: question_id (string), score (number 1-10), feedback (string), strengths (string), improvements (string). Return ONLY the JSON array."},
 			{Role: openai.ChatMessageRoleUser, Content: prompt},
