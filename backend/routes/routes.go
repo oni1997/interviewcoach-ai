@@ -26,6 +26,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 	profile := &handlers.ProfileHandler{}
 	interview := &handlers.InterviewHandler{}
 	dashboard := &handlers.DashboardHandler{}
+	ai := &handlers.AIHandler{Config: cfg}
 
 	api := r.Group("/api")
 
@@ -46,6 +47,10 @@ func Setup(cfg *config.Config) *gin.Engine {
 	api.GET("/dashboard/history", middleware.AuthRequired(cfg), dashboard.GetHistory)
 	api.POST("/profile/resume", middleware.AuthRequired(cfg), profile.UploadResume)
 	api.DELETE("/profile/resume", middleware.AuthRequired(cfg), profile.DeleteResume)
+
+	api.POST("/ai/generate-questions", ai.GenerateQuestions)
+	api.POST("/ai/evaluate", ai.EvaluateAnswer)
+	api.POST("/auth/forgot-password", auth.ForgotPassword)
 
 	return r
 }
