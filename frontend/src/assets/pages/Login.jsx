@@ -1,4 +1,5 @@
 import { useState } from "react";
+import "../styles/Auth.css";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -19,7 +20,8 @@ function Login() {
       <h2>Login</h2>
 
       <form onSubmit={handleLogin}>
-
+<div className="auth-container">
+    <div className="auth-card">
         <div className="mb-3">
           <label>Email</label>
 
@@ -47,7 +49,8 @@ function Login() {
         <button className="btn btn-primary">
           Login
         </button>
-
+    </div>
+</div>
       </form>
     </div>
   );

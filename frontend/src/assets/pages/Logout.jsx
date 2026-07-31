@@ -1,3 +1,5 @@
+import "../styles/Auth.css";
+
 function Logout() {
 
   const logout = () => {

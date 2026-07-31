@@ -1,3 +1,4 @@
+import "../styles/Auth.css";
 import { useState } from "react";
 
 function Register() {
