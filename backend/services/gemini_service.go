@@ -31,6 +31,23 @@ type EvaluateAnswerRequest struct {
 	Role       string `json:"role"`
 }
 
+<<<<<<< HEAD
+=======
+type ScoreAnswerItem struct {
+	QuestionID string `json:"question_id"`
+	Question   string `json:"question"`
+	Answer     string `json:"answer"`
+}
+
+type ScoredAnswer struct {
+	QuestionID   string  `json:"question_id"`
+	Score        float64 `json:"score"`
+	Feedback     string  `json:"feedback"`
+	Strengths    string  `json:"strengths"`
+	Improvements string  `json:"improvements"`
+}
+
+>>>>>>> 7d7c34f000c23813729e54fda65e92601914768c
 type GeminiRequest struct {
 	Contents []Content `json:"contents"`
 }
@@ -167,6 +184,43 @@ Return ONLY valid JSON in this exact structure:
 	}
 
 	return result, nil
+}
+
+func ScoreAnswersWithGemini(apiKey string, jobRole, interviewType string, items []ScoreAnswerItem) ([]ScoredAnswer, error) {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("You are an expert interview evaluator. Score these %s interview answers for a %s position on a scale of 1-10.\n\n", interviewType, jobRole))
+	for i, item := range items {
+		sb.WriteString(fmt.Sprintf("Question %d (ID: %s): %s\nAnswer: %s\n\n", i+1, item.QuestionID, item.Question, item.Answer))
+	}
+	sb.WriteString(`Return ONLY valid JSON, a JSON array. Each object must have:
+{
+  "question_id": "string",
+  "score": number (1-10),
+  "feedback": "string (detailed)",
+  "strengths": "string",
+  "improvements": "string"
+}`)
+
+	text, err := tryGeminiModels(apiKey, sb.String())
+	if err != nil {
+		return nil, err
+	}
+
+	cleaned := cleanJSONResponse(text)
+	if !strings.HasPrefix(strings.TrimSpace(cleaned), "[") {
+		if i := strings.Index(cleaned, "["); i != -1 {
+			if j := strings.LastIndex(cleaned, "]"); j != -1 && j > i {
+				cleaned = cleaned[i : j+1]
+			}
+		}
+	}
+
+	var scored []ScoredAnswer
+	if err := json.Unmarshal([]byte(cleaned), &scored); err != nil {
+		return nil, fmt.Errorf("failed to parse scored answers: %v\nRaw text: %s", err, text)
+	}
+
+	return scored, nil
 }
 
 func EvaluateAnswerWithGemini(apiKey string, req EvaluateAnswerRequest) (map[string]interface{}, error) {
