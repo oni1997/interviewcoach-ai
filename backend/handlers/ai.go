@@ -12,6 +12,7 @@ import (
 
 	"github.com/oni1997/interviewcoach-ai/backend/config"
 	"github.com/oni1997/interviewcoach-ai/backend/database"
+	"github.com/oni1997/interviewcoach-ai/backend/services"
 )
 
 type AIHandler struct {
@@ -19,36 +20,36 @@ type AIHandler struct {
 }
 
 type GenerateQuestionsRequest struct {
-	JobRole        string `json:"job_role" binding:"required"`
-	InterviewType  string `json:"interview_type" binding:"required,oneof=technical behavioral"`
-	NumQuestions   int    `json:"num_questions"`
+	JobRole       string   `json:"job_role"`
+	Role          string   `json:"role"`
+	Experience    string   `json:"experience"`
+	Topics        []string `json:"topics"`
+	Count         int      `json:"count"`
+	NumQuestions  int      `json:"num_questions"`
+	Difficulty    string   `json:"difficulty"`
+	InterviewType string   `json:"interview_type" binding:"omitempty,oneof=technical behavioral"`
 }
 
-type ScoreAnswerRequest struct {
-	Question       string `json:"question" binding:"required"`
-	Answer         string `json:"answer" binding:"required"`
-	JobRole        string `json:"job_role"`
-	InterviewType  string `json:"interview_type"`
+type EvaluateAnswerRequest struct {
+	Question   string `json:"question" binding:"required"`
+	UserAnswer string `json:"userAnswer"`
+	Answer     string `json:"answer" binding:"required_without=UserAnswer"`
+	JobRole    string `json:"job_role"`
+	Role       string `json:"role"`
 }
 
 type ScoreAnswersRequest struct {
-	JobRole       string             `json:"job_role"`
-	InterviewType string             `json:"interview_type"`
-	Items         []ScoreAnswerItem  `json:"items" binding:"required,min=1"`
+	JobRole       string                  `json:"job_role"`
+	InterviewType string                  `json:"interview_type"`
+	Items         []services.ScoreAnswerItem `json:"items" binding:"required,min=1"`
 }
 
-type ScoreAnswerItem struct {
-	QuestionID string `json:"question_id" binding:"required"`
-	Question   string `json:"question" binding:"required"`
-	Answer     string `json:"answer" binding:"required"`
+func (h *AIHandler) hasGemini() bool {
+	return h.Config != nil && h.Config.GEMINI_API_KEY != ""
 }
 
-type ScoredAnswer struct {
-	QuestionID  string  `json:"question_id"`
-	Score       float64 `json:"score"`
-	Feedback    string  `json:"feedback"`
-	Strengths   string  `json:"strengths"`
-	Improvements string `json:"improvements"`
+func (h *AIHandler) hasOpenAI() bool {
+	return h.Config != nil && h.Config.AIKey != ""
 }
 
 func (h *AIHandler) GenerateQuestions(c *gin.Context) {
@@ -58,18 +59,121 @@ func (h *AIHandler) GenerateQuestions(c *gin.Context) {
 		return
 	}
 
-	if req.NumQuestions <= 0 || req.NumQuestions > 10 {
-		req.NumQuestions = 5
+	role := req.Role
+	if role == "" {
+		role = req.JobRole
+	}
+	if role == "" {
+		role = "Software Engineer"
 	}
 
-	if h.Config.AIKey == "" {
-		questions := h.fallbackQuestions(req.JobRole, req.InterviewType, req.NumQuestions)
-		c.JSON(http.StatusOK, gin.H{"questions": questions, "source": "fallback"})
+	count := req.Count
+	if count == 0 {
+		count = req.NumQuestions
+	}
+	if count <= 0 || count > 10 {
+		count = 5
+	}
+
+	interviewType := req.InterviewType
+	if interviewType == "" {
+		interviewType = "technical"
+	}
+
+	// 1) Gemini primary
+	if h.hasGemini() {
+		greq := services.GenerateQuestionsRequest{
+			Role:       role,
+			Experience: req.Experience,
+			Topics:     req.Topics,
+			Count:      count,
+			Difficulty: req.Difficulty,
+		}
+		if greq.Difficulty == "" {
+			greq.Difficulty = "mixed"
+		}
+		if greq.Experience == "" {
+			greq.Experience = "mid-level"
+		}
+		result, err := services.GenerateQuestionsWithGemini(h.Config.GEMINI_API_KEY, greq)
+		if err == nil {
+			result["source"] = "gemini"
+			c.JSON(http.StatusOK, result)
+			return
+		}
+		fmt.Printf("⚠️  Gemini question generation failed, falling back: %v\n", err)
+	}
+
+	// 2) OpenAI fallback
+	if h.hasOpenAI() {
+		questions, err := h.generateWithOpenAI(role, interviewType, count)
+		if err == nil {
+			c.JSON(http.StatusOK, gin.H{"questions": questions, "source": "openai"})
+			return
+		}
+		fmt.Printf("⚠️  OpenAI question generation failed, falling back: %v\n", err)
+	}
+
+	// 3) Local fallback
+	c.JSON(http.StatusOK, gin.H{"questions": h.fallbackQuestions(role, interviewType, count), "source": "fallback"})
+}
+
+func (h *AIHandler) EvaluateAnswer(c *gin.Context) {
+	var req EvaluateAnswerRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	prompt := h.buildQuestionPrompt(req.JobRole, req.InterviewType, req.NumQuestions)
+	answer := req.UserAnswer
+	if answer == "" {
+		answer = req.Answer
+	}
+	role := req.Role
+	if role == "" {
+		role = req.JobRole
+	}
 
+	// 1) Gemini primary
+	if h.hasGemini() {
+		greq := services.EvaluateAnswerRequest{
+			Question:   req.Question,
+			UserAnswer: answer,
+			Role:       role,
+		}
+		result, err := services.EvaluateAnswerWithGemini(h.Config.GEMINI_API_KEY, greq)
+		if err == nil {
+			result["source"] = "gemini"
+			c.JSON(http.StatusOK, result)
+			return
+		}
+		fmt.Printf("⚠️  Gemini evaluation failed, falling back: %v\n", err)
+	}
+
+	// 2) OpenAI fallback
+	if h.hasOpenAI() {
+		result, err := h.evaluateWithOpenAI(req.Question, answer, role)
+		if err == nil {
+			result["source"] = "openai"
+			c.JSON(http.StatusOK, result)
+			return
+		}
+		fmt.Printf("⚠️  OpenAI evaluation failed, falling back: %v\n", err)
+	}
+
+	// 3) Local heuristic fallback
+	score := h.fallbackScore(answer)
+	c.JSON(http.StatusOK, gin.H{
+		"score":      score * 10,
+		"feedback":   "This is a heuristic evaluation. Connect an AI provider to get detailed feedback.",
+		"strengths":  []string{"Attempted an answer"},
+		"weaknesses": []string{"Add more specific examples and structure"},
+		"source":     "fallback",
+	})
+}
+
+func (h *AIHandler) generateWithOpenAI(jobRole, interviewType string, num int) ([]string, error) {
+	prompt := h.buildQuestionPrompt(jobRole, interviewType, num)
 	client := openai.NewClient(h.Config.AIKey)
 	resp, err := client.CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
 		Model: openai.GPT4oMini,
@@ -81,25 +185,37 @@ func (h *AIHandler) GenerateQuestions(c *gin.Context) {
 		MaxTokens:   1000,
 	})
 	if err != nil {
-		questions := h.fallbackQuestions(req.JobRole, req.InterviewType, req.NumQuestions)
-		c.JSON(http.StatusOK, gin.H{"questions": questions, "source": "fallback"})
-		return
+		return nil, err
 	}
 
-	content := resp.Choices[0].Message.Content
-	content = strings.TrimPrefix(content, "```json")
-	content = strings.TrimPrefix(content, "```")
-	content = strings.TrimSuffix(content, "```")
-	content = strings.TrimSpace(content)
-
+	content := cleanAIJSON(resp.Choices[0].Message.Content)
 	var questions []string
 	if err := json.Unmarshal([]byte(content), &questions); err != nil {
-		questions = h.fallbackQuestions(req.JobRole, req.InterviewType, req.NumQuestions)
-		c.JSON(http.StatusOK, gin.H{"questions": questions, "source": "fallback"})
-		return
+		return nil, err
+	}
+	return questions, nil
+}
+
+func (h *AIHandler) evaluateWithOpenAI(question, answer, role string) (map[string]interface{}, error) {
+	client := openai.NewClient(h.Config.AIKey)
+	resp, err := client.CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
+		Model: openai.GPT4oMini,
+		Messages: []openai.ChatCompletionMessage{
+			{Role: openai.ChatMessageRoleSystem, Content: "You are a senior technical interviewer. Evaluate the candidate's answer for the given question. Return ONLY a JSON object with keys: score (0-100), feedback, strengths (array of strings), weaknesses (array of strings)."},
+			{Role: openai.ChatMessageRoleUser, Content: fmt.Sprintf("Role: %s\nQuestion: %s\nAnswer: %s", role, question, answer)},
+		},
+		Temperature: 0.3,
+		MaxTokens:   1000,
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	c.JSON(http.StatusOK, gin.H{"questions": questions, "source": "ai"})
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(cleanAIJSON(resp.Choices[0].Message.Content)), &result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (h *AIHandler) ScoreAnswers(c *gin.Context) {
@@ -112,44 +228,59 @@ func (h *AIHandler) ScoreAnswers(c *gin.Context) {
 	}
 
 	var overallScore float64
-	var scoredAnswers []ScoredAnswer
+	var scoredAnswers []services.ScoredAnswer
 
-	if h.Config.AIKey == "" {
-		for _, item := range req.Items {
-			score := h.fallbackScore(item.Answer)
-			feedback := fmt.Sprintf("Good effort on this %s question. Consider providing more specific examples.", req.InterviewType)
-			overallScore += score
-
-			scoredAnswers = append(scoredAnswers, ScoredAnswer{
-				QuestionID:  item.QuestionID,
-				Score:       score,
-				Feedback:    feedback,
-				Strengths:   "Attempted an answer",
-				Improvements: "Add more detail and specific examples",
-			})
-
-			database.DB.Exec(
-				`INSERT INTO interview_feedback (answer_id, feedback_text, strengths, improvements)
-				 SELECT id, $1, $2, $3 FROM interview_answers WHERE question_id = $4`,
-				feedback, "Attempted an answer", "Add more detail and specific examples", item.QuestionID,
-			)
-		}
-		if len(req.Items) > 0 {
-			overallScore = overallScore / float64(len(req.Items))
-		}
-
-		database.DB.Exec(
-			`UPDATE interview_sessions SET overall_score = $1 WHERE id = $2`,
-			overallScore, sessionID,
-		)
-
-		c.JSON(http.StatusOK, gin.H{"scored_answers": scoredAnswers, "overall_score": overallScore, "source": "fallback"})
-		return
+	if req.InterviewType == "" {
+		req.InterviewType = "technical"
+	}
+	if req.JobRole == "" {
+		req.JobRole = "Software Engineer"
 	}
 
-	prompt := h.buildScorePrompt(req.JobRole, req.InterviewType, req.Items)
+	// 1) Gemini primary
+	if h.hasGemini() {
+		scored, err := services.ScoreAnswersWithGemini(h.Config.GEMINI_API_KEY, req.JobRole, req.InterviewType, req.Items)
+		if err == nil {
+			scoredAnswers = scored
+			source := "gemini"
+			h.persistScoredAnswers(scoredAnswers, sessionID, &overallScore)
+			c.JSON(http.StatusOK, gin.H{"scored_answers": scoredAnswers, "overall_score": overallScore, "source": source})
+			return
+		}
+		fmt.Printf("⚠️  Gemini scoring failed, falling back: %v\n", err)
+	}
 
+	// 2) OpenAI fallback
+	if h.hasOpenAI() {
+		scored, err := h.scoreWithOpenAI(req)
+		if err == nil {
+			scoredAnswers = scored
+			h.persistScoredAnswers(scoredAnswers, sessionID, &overallScore)
+			c.JSON(http.StatusOK, gin.H{"scored_answers": scoredAnswers, "overall_score": overallScore, "source": "openai"})
+			return
+		}
+		fmt.Printf("⚠️  OpenAI scoring failed, falling back: %v\n", err)
+	}
+
+	// 3) Local heuristic fallback
+	for _, item := range req.Items {
+		score := h.fallbackScore(item.Answer)
+		feedback := fmt.Sprintf("Good effort on this %s question. Consider providing more specific examples.", req.InterviewType)
+		scoredAnswers = append(scoredAnswers, services.ScoredAnswer{
+			QuestionID:   item.QuestionID,
+			Score:        score,
+			Feedback:     feedback,
+			Strengths:    "Attempted an answer",
+			Improvements: "Add more detail and specific examples",
+		})
+	}
+	h.persistScoredAnswers(scoredAnswers, sessionID, &overallScore)
+	c.JSON(http.StatusOK, gin.H{"scored_answers": scoredAnswers, "overall_score": overallScore, "source": "fallback"})
+}
+
+func (h *AIHandler) scoreWithOpenAI(req ScoreAnswersRequest) ([]services.ScoredAnswer, error) {
 	client := openai.NewClient(h.Config.AIKey)
+	prompt := h.buildScorePrompt(req.JobRole, req.InterviewType, req.Items)
 	resp, err := client.CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
 		Model: openai.GPT4oMini,
 		Messages: []openai.ChatCompletionMessage{
@@ -160,24 +291,23 @@ func (h *AIHandler) ScoreAnswers(c *gin.Context) {
 		MaxTokens:   2000,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "AI scoring failed"})
-		return
+		return nil, err
 	}
 
-	content := resp.Choices[0].Message.Content
-	content = strings.TrimPrefix(content, "```json")
-	content = strings.TrimPrefix(content, "```")
-	content = strings.TrimSuffix(content, "```")
-	content = strings.TrimSpace(content)
+	var scored []services.ScoredAnswer
+	if err := json.Unmarshal([]byte(cleanAIJSON(resp.Choices[0].Message.Content)), &scored); err != nil {
+		return nil, err
+	}
+	return scored, nil
+}
 
-	if err := json.Unmarshal([]byte(content), &scoredAnswers); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse AI response"})
+func (h *AIHandler) persistScoredAnswers(scored []services.ScoredAnswer, sessionID string, overall *float64) {
+	if len(scored) == 0 {
 		return
 	}
-
-	for _, sa := range scoredAnswers {
-		overallScore += sa.Score
-
+	var total float64
+	for _, sa := range scored {
+		total += sa.Score
 		var answerID string
 		err := database.DB.QueryRow(
 			`SELECT id FROM interview_answers WHERE question_id = $1`, sa.QuestionID,
@@ -185,28 +315,20 @@ func (h *AIHandler) ScoreAnswers(c *gin.Context) {
 		if err != nil {
 			continue
 		}
-
-		database.DB.Exec(
+		_, _ = database.DB.Exec(
 			`UPDATE interview_answers SET score = $1 WHERE id = $2`, sa.Score, answerID,
 		)
-
-		database.DB.Exec(
+		_, _ = database.DB.Exec(
 			`INSERT INTO interview_feedback (answer_id, feedback_text, strengths, improvements)
 			 VALUES ($1, $2, $3, $4)`,
 			answerID, sa.Feedback, sa.Strengths, sa.Improvements,
 		)
 	}
-
-	if len(req.Items) > 0 {
-		overallScore = overallScore / float64(len(req.Items))
-	}
-
-	database.DB.Exec(
+	*overall = total / float64(len(scored))
+	_, _ = database.DB.Exec(
 		`UPDATE interview_sessions SET overall_score = $1 WHERE id = $2`,
-		overallScore, sessionID,
+		*overall, sessionID,
 	)
-
-	c.JSON(http.StatusOK, gin.H{"scored_answers": scoredAnswers, "overall_score": overallScore, "source": "ai"})
 }
 
 func (h *AIHandler) GetFeedback(c *gin.Context) {
@@ -228,12 +350,12 @@ func (h *AIHandler) GetFeedback(c *gin.Context) {
 	defer rows.Close()
 
 	type FeedbackItem struct {
-		Question    string  `json:"question"`
-		Answer      string  `json:"answer"`
+		Question    string   `json:"question"`
+		Answer      string   `json:"answer"`
 		Score       *float64 `json:"score"`
-		Feedback    string  `json:"feedback"`
-		Strengths   string  `json:"strengths"`
-		Improvements string `json:"improvements"`
+		Feedback    string   `json:"feedback"`
+		Strengths   string   `json:"strengths"`
+		Improvements string  `json:"improvements"`
 	}
 
 	var items []FeedbackItem
@@ -255,7 +377,7 @@ func (h *AIHandler) buildQuestionPrompt(jobRole, interviewType string, num int) 
 	return fmt.Sprintf("Generate %d realistic behavioral interview questions for a %s position. Use STAR method scenarios covering teamwork, leadership, conflict, and problem-solving. Return as a JSON array of strings.", num, jobRole)
 }
 
-func (h *AIHandler) buildScorePrompt(jobRole, interviewType string, items []ScoreAnswerItem) string {
+func (h *AIHandler) buildScorePrompt(jobRole, interviewType string, items []services.ScoreAnswerItem) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Evaluate these %s interview answers for a %s position:\n\n", interviewType, jobRole))
 	for i, item := range items {
@@ -342,4 +464,11 @@ func (h *AIHandler) fallbackScore(answer string) float64 {
 	default:
 		return 4.0
 	}
+}
+
+func cleanAIJSON(content string) string {
+	content = strings.TrimPrefix(content, "```json")
+	content = strings.TrimPrefix(content, "```")
+	content = strings.TrimSuffix(content, "```")
+	return strings.TrimSpace(content)
 }
