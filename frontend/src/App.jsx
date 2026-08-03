@@ -32,6 +32,9 @@ export default function App() {
   const [evaluating, setEvaluating] = useState(false);
   const [evaluations, setEvaluations] = useState([]);
   const [results, setResults] = useState(null);
+  const [viewSession, setViewSession] = useState(null);
+  const [viewSessionDetail, setViewSessionDetail] = useState([]);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
 
   const [profileForm, setProfileForm] = useState({ headline: '', bio: '', target_role: '', experience_level: '', skills: '' });
@@ -150,6 +153,21 @@ export default function App() {
     setProfile(null);
     setHistory([]);
     setStats({ total_sessions: 0, completed_sessions: 0, average_score: null });
+  };
+
+  const openSessionDetail = async (session) => {
+    setViewSession(session);
+    setLoadingDetail(true);
+    try {
+      const res = await api.get(`/sessions/${session.id}/feedback`);
+      setViewSessionDetail(res.data || []);
+      setScreen('history-detail');
+    } catch (err) {
+      setError('Failed to load session details');
+      setTimeout(() => setError(''), 2000);
+    } finally {
+      setLoadingDetail(false);
+    }
   };
 
   const handleForgotPassword = async (e) => {
@@ -579,7 +597,7 @@ return (
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {history.map((session) => (
-                    <div key={session.id} className="history-item" style={{ backgroundColor: '#0f172a', padding: '20px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div key={session.id} className="history-item" onClick={() => openSessionDetail(session)} style={{ backgroundColor: '#0f172a', padding: '20px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', transition: 'transform 0.2s' }}>
                       <div>
                         <p style={{ fontSize: '16px', fontWeight: '700', color: '#ffffff', margin: '0 0 4px 0' }}>{session.role_title || 'Unknown Role'}</p>
                         <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0, fontFamily: 'monospace' }}>
@@ -591,12 +609,83 @@ return (
                         {session.overall_score != null && (
                           <span style={{ fontSize: '18px', fontWeight: '900', color: '#eab308' }}>{Number(session.overall_score).toFixed(1)}</span>
                         )}
+                        <span style={{ fontSize: '14px', color: '#38bdf8', fontWeight: '900' }}>View →</span>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
               <button onClick={() => setScreen('dashboard')} style={{ width: '100%', marginTop: '24px', backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>Back to Dashboard</button>
+            </div>
+          </div>
+        )}
+
+        {screen === 'history-detail' && viewSession && (
+          <div className="page-wrap-lg" style={{ width: '100%' }}>
+            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', margin: 0 }}>{viewSession.role_title || 'Interview Session'}</h2>
+                {viewSession.overall_score != null && (
+                  <span style={{ fontSize: '32px', fontWeight: '900', color: Number(viewSession.overall_score) >= 70 ? '#10b981' : Number(viewSession.overall_score) >= 40 ? '#eab308' : '#ef4444' }}>{Number(viewSession.overall_score).toFixed(1)}%</span>
+                )}
+              </div>
+              <p style={{ fontSize: '15px', color: '#cbd5e1', margin: '0 0 28px 0' }}>
+                {viewSession.interview_type?.toUpperCase()} · {new Date(viewSession.started_at).toLocaleDateString()}
+                {viewSession.status && <span style={{ marginLeft: '12px', fontSize: '13px', fontFamily: 'monospace', fontWeight: '900', padding: '4px 12px', borderRadius: '8px', backgroundColor: viewSession.status === 'completed' ? '#10b981' : '#eab308', color: '#000' }}>{viewSession.status}</span>}
+              </p>
+
+              {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
+
+              {loadingDetail ? (
+                <p style={{ color: '#94a3b8', textAlign: 'center', fontSize: '16px' }}>Loading session details...</p>
+              ) : viewSessionDetail.length === 0 ? (
+                <p style={{ color: '#94a3b8', textAlign: 'center', fontSize: '16px' }}>No answers were recorded for this session.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {viewSessionDetail.map((item, idx) => (
+                    <div key={idx} style={{ backgroundColor: '#0f172a', padding: '20px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                        <p style={{ fontSize: '14px', fontWeight: '800', color: '#38bdf8', margin: 0, fontFamily: 'monospace' }}>QUESTION {idx + 1}</p>
+                        {item.score != null && (
+                          <span style={{ fontSize: '18px', fontWeight: '900', color: item.score >= 70 ? '#10b981' : item.score >= 40 ? '#eab308' : '#ef4444' }}>{Math.round(item.score)}%</span>
+                        )}
+                      </div>
+                      <p style={{ fontSize: '15px', fontWeight: '600', color: '#ffffff', margin: '0 0 12px 0', lineHeight: '1.5' }}>{item.question}</p>
+
+                      <div style={{ backgroundColor: '#1e293b', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.15)', marginBottom: '12px' }}>
+                        <p style={{ fontSize: '12px', fontWeight: '900', color: '#94a3b8', margin: '0 0 6px 0', textTransform: 'uppercase' }}>Your Answer</p>
+                        <p style={{ fontSize: '14px', color: '#e2e8f0', margin: 0, lineHeight: '1.6', fontWeight: '500' }}>{item.answer || <span style={{ color: '#94a3b8' }}>No answer recorded</span>}</p>
+                      </div>
+
+                      {item.feedback && (
+                        <div style={{ marginBottom: '12px' }}>
+                          <p style={{ fontSize: '12px', fontWeight: '900', color: '#94a3b8', margin: '0 0 6px 0', textTransform: 'uppercase' }}>AI Feedback</p>
+                          <p style={{ fontSize: '14px', color: '#cbd5e1', margin: 0, lineHeight: '1.6', fontWeight: '500' }}>{item.feedback}</p>
+                        </div>
+                      )}
+
+                      {(item.strengths || item.improvements) && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                          {item.strengths && (
+                            <div style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(16, 185, 129, 0.4)' }}>
+                              <p style={{ fontSize: '12px', fontWeight: '900', color: '#10b981', margin: '0 0 6px 0', textTransform: 'uppercase' }}>Strengths</p>
+                              <p style={{ fontSize: '13px', color: '#d1fae5', margin: 0, lineHeight: '1.5', fontWeight: '500' }}>{item.strengths}</p>
+                            </div>
+                          )}
+                          {item.improvements && (
+                            <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(239, 68, 68, 0.4)' }}>
+                              <p style={{ fontSize: '12px', fontWeight: '900', color: '#f87171', margin: '0 0 6px 0', textTransform: 'uppercase' }}>Improve</p>
+                              <p style={{ fontSize: '13px', color: '#fee2e2', margin: 0, lineHeight: '1.5', fontWeight: '500' }}>{item.improvements}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button onClick={() => setScreen('history')} style={{ width: '100%', marginTop: '24px', backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>Back to History</button>
             </div>
           </div>
         )}

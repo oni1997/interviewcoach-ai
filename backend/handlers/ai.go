@@ -469,11 +469,11 @@ func (h *AIHandler) GetFeedback(c *gin.Context) {
 	sessionID := c.Param("id")
 
 	rows, err := database.DB.Query(
-		`SELECT f.id, f.answer_id, f.feedback_text, f.strengths, f.improvements,
-		        iq.question_text, ia.answer_text, ia.score
-		 FROM interview_feedback f
-		 JOIN interview_answers ia ON f.answer_id = ia.id
-		 JOIN interview_questions iq ON ia.question_id = iq.id
+		`SELECT iq.question_text, ia.answer_text, ia.score,
+		        f.feedback_text, f.strengths, f.improvements
+		 FROM interview_questions iq
+		 LEFT JOIN interview_answers ia ON ia.question_id = iq.id
+		 LEFT JOIN interview_feedback f ON f.answer_id = ia.id
 		 WHERE iq.session_id = $1
 		 ORDER BY iq.question_order`, sessionID,
 	)
@@ -484,20 +484,19 @@ func (h *AIHandler) GetFeedback(c *gin.Context) {
 	defer rows.Close()
 
 	type FeedbackItem struct {
-		Question    string   `json:"question"`
-		Answer      string   `json:"answer"`
-		Score       *float64 `json:"score"`
-		Feedback    string   `json:"feedback"`
-		Strengths   string   `json:"strengths"`
-		Improvements string  `json:"improvements"`
+		Question     string   `json:"question"`
+		Answer       string   `json:"answer"`
+		Score        *float64 `json:"score"`
+		Feedback     *string  `json:"feedback"`
+		Strengths    *string  `json:"strengths"`
+		Improvements *string  `json:"improvements"`
 	}
 
 	var items []FeedbackItem
 	for rows.Next() {
 		var fi FeedbackItem
-		var id, answerID string
-		_ = rows.Scan(&id, &answerID, &fi.Feedback, &fi.Strengths, &fi.Improvements,
-			&fi.Question, &fi.Answer, &fi.Score)
+		_ = rows.Scan(&fi.Question, &fi.Answer, &fi.Score,
+			&fi.Feedback, &fi.Strengths, &fi.Improvements)
 		items = append(items, fi)
 	}
 
