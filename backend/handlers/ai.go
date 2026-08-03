@@ -12,10 +12,7 @@ import (
 
 	"github.com/oni1997/interviewcoach-ai/backend/config"
 	"github.com/oni1997/interviewcoach-ai/backend/database"
-<<<<<<< HEAD
-=======
 	"github.com/oni1997/interviewcoach-ai/backend/services"
->>>>>>> 7d7c34f000c23813729e54fda65e92601914768c
 )
 
 type AIHandler struct {
@@ -23,38 +20,6 @@ type AIHandler struct {
 }
 
 type GenerateQuestionsRequest struct {
-<<<<<<< HEAD
-	JobRole        string `json:"job_role" binding:"required"`
-	InterviewType  string `json:"interview_type" binding:"required,oneof=technical behavioral"`
-	NumQuestions   int    `json:"num_questions"`
-}
-
-type ScoreAnswerRequest struct {
-	Question       string `json:"question" binding:"required"`
-	Answer         string `json:"answer" binding:"required"`
-	JobRole        string `json:"job_role"`
-	InterviewType  string `json:"interview_type"`
-}
-
-type ScoreAnswersRequest struct {
-	JobRole       string             `json:"job_role"`
-	InterviewType string             `json:"interview_type"`
-	Items         []ScoreAnswerItem  `json:"items" binding:"required,min=1"`
-}
-
-type ScoreAnswerItem struct {
-	QuestionID string `json:"question_id" binding:"required"`
-	Question   string `json:"question" binding:"required"`
-	Answer     string `json:"answer" binding:"required"`
-}
-
-type ScoredAnswer struct {
-	QuestionID  string  `json:"question_id"`
-	Score       float64 `json:"score"`
-	Feedback    string  `json:"feedback"`
-	Strengths   string  `json:"strengths"`
-	Improvements string `json:"improvements"`
-=======
 	JobRole       string   `json:"job_role"`
 	Role          string   `json:"role"`
 	Experience    string   `json:"experience"`
@@ -79,6 +44,10 @@ type ScoreAnswersRequest struct {
 	Items         []services.ScoreAnswerItem `json:"items" binding:"required,min=1"`
 }
 
+type SaveEvaluationRequest struct {
+	Items []services.ScoredAnswer `json:"items" binding:"required,min=1"`
+}
+
 func (h *AIHandler) hasGemini() bool {
 	return h.Config != nil && h.Config.GEMINI_API_KEY != ""
 }
@@ -95,7 +64,6 @@ func (h *AIHandler) nvidiaClient() *openai.Client {
 	cfg := openai.DefaultConfig(h.Config.NVIDIA_API_KEY)
 	cfg.BaseURL = "https://integrate.api.nvidia.com/v1"
 	return openai.NewClientWithConfig(cfg)
->>>>>>> 7d7c34f000c23813729e54fda65e92601914768c
 }
 
 func (h *AIHandler) GenerateQuestions(c *gin.Context) {
@@ -105,20 +73,6 @@ func (h *AIHandler) GenerateQuestions(c *gin.Context) {
 		return
 	}
 
-<<<<<<< HEAD
-	if req.NumQuestions <= 0 || req.NumQuestions > 10 {
-		req.NumQuestions = 5
-	}
-
-	if h.Config.AIKey == "" {
-		questions := h.fallbackQuestions(req.JobRole, req.InterviewType, req.NumQuestions)
-		c.JSON(http.StatusOK, gin.H{"questions": questions, "source": "fallback"})
-		return
-	}
-
-	prompt := h.buildQuestionPrompt(req.JobRole, req.InterviewType, req.NumQuestions)
-
-=======
 	role := req.Role
 	if role == "" {
 		role = req.JobRole
@@ -255,7 +209,6 @@ func (h *AIHandler) EvaluateAnswer(c *gin.Context) {
 
 func (h *AIHandler) generateWithOpenAI(jobRole, interviewType string, num int) ([]string, error) {
 	prompt := h.buildQuestionPrompt(jobRole, interviewType, num)
->>>>>>> 7d7c34f000c23813729e54fda65e92601914768c
 	client := openai.NewClient(h.Config.AIKey)
 	resp, err := client.CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
 		Model: openai.GPT4oMini,
@@ -267,27 +220,6 @@ func (h *AIHandler) generateWithOpenAI(jobRole, interviewType string, num int) (
 		MaxTokens:   1000,
 	})
 	if err != nil {
-<<<<<<< HEAD
-		questions := h.fallbackQuestions(req.JobRole, req.InterviewType, req.NumQuestions)
-		c.JSON(http.StatusOK, gin.H{"questions": questions, "source": "fallback"})
-		return
-	}
-
-	content := resp.Choices[0].Message.Content
-	content = strings.TrimPrefix(content, "```json")
-	content = strings.TrimPrefix(content, "```")
-	content = strings.TrimSuffix(content, "```")
-	content = strings.TrimSpace(content)
-
-	var questions []string
-	if err := json.Unmarshal([]byte(content), &questions); err != nil {
-		questions = h.fallbackQuestions(req.JobRole, req.InterviewType, req.NumQuestions)
-		c.JSON(http.StatusOK, gin.H{"questions": questions, "source": "fallback"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"questions": questions, "source": "ai"})
-=======
 		return nil, err
 	}
 
@@ -319,7 +251,6 @@ func (h *AIHandler) evaluateWithOpenAI(question, answer, role string) (map[strin
 		return nil, err
 	}
 	return result, nil
->>>>>>> 7d7c34f000c23813729e54fda65e92601914768c
 }
 
 func (h *AIHandler) ScoreAnswers(c *gin.Context) {
@@ -332,46 +263,6 @@ func (h *AIHandler) ScoreAnswers(c *gin.Context) {
 	}
 
 	var overallScore float64
-<<<<<<< HEAD
-	var scoredAnswers []ScoredAnswer
-
-	if h.Config.AIKey == "" {
-		for _, item := range req.Items {
-			score := h.fallbackScore(item.Answer)
-			feedback := fmt.Sprintf("Good effort on this %s question. Consider providing more specific examples.", req.InterviewType)
-			overallScore += score
-
-			scoredAnswers = append(scoredAnswers, ScoredAnswer{
-				QuestionID:  item.QuestionID,
-				Score:       score,
-				Feedback:    feedback,
-				Strengths:   "Attempted an answer",
-				Improvements: "Add more detail and specific examples",
-			})
-
-			database.DB.Exec(
-				`INSERT INTO interview_feedback (answer_id, feedback_text, strengths, improvements)
-				 SELECT id, $1, $2, $3 FROM interview_answers WHERE question_id = $4`,
-				feedback, "Attempted an answer", "Add more detail and specific examples", item.QuestionID,
-			)
-		}
-		if len(req.Items) > 0 {
-			overallScore = overallScore / float64(len(req.Items))
-		}
-
-		database.DB.Exec(
-			`UPDATE interview_sessions SET overall_score = $1 WHERE id = $2`,
-			overallScore, sessionID,
-		)
-
-		c.JSON(http.StatusOK, gin.H{"scored_answers": scoredAnswers, "overall_score": overallScore, "source": "fallback"})
-		return
-	}
-
-	prompt := h.buildScorePrompt(req.JobRole, req.InterviewType, req.Items)
-
-	client := openai.NewClient(h.Config.AIKey)
-=======
 	var scoredAnswers []services.ScoredAnswer
 
 	if req.InterviewType == "" {
@@ -437,7 +328,6 @@ func (h *AIHandler) ScoreAnswers(c *gin.Context) {
 func (h *AIHandler) scoreWithOpenAI(req ScoreAnswersRequest) ([]services.ScoredAnswer, error) {
 	client := openai.NewClient(h.Config.AIKey)
 	prompt := h.buildScorePrompt(req.JobRole, req.InterviewType, req.Items)
->>>>>>> 7d7c34f000c23813729e54fda65e92601914768c
 	resp, err := client.CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
 		Model: openai.GPT4oMini,
 		Messages: []openai.ChatCompletionMessage{
@@ -448,26 +338,6 @@ func (h *AIHandler) scoreWithOpenAI(req ScoreAnswersRequest) ([]services.ScoredA
 		MaxTokens:   2000,
 	})
 	if err != nil {
-<<<<<<< HEAD
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "AI scoring failed"})
-		return
-	}
-
-	content := resp.Choices[0].Message.Content
-	content = strings.TrimPrefix(content, "```json")
-	content = strings.TrimPrefix(content, "```")
-	content = strings.TrimSuffix(content, "```")
-	content = strings.TrimSpace(content)
-
-	if err := json.Unmarshal([]byte(content), &scoredAnswers); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse AI response"})
-		return
-	}
-
-	for _, sa := range scoredAnswers {
-		overallScore += sa.Score
-
-=======
 		return nil, err
 	}
 
@@ -554,7 +424,6 @@ func (h *AIHandler) persistScoredAnswers(scored []services.ScoredAnswer, session
 	var total float64
 	for _, sa := range scored {
 		total += sa.Score
->>>>>>> 7d7c34f000c23813729e54fda65e92601914768c
 		var answerID string
 		err := database.DB.QueryRow(
 			`SELECT id FROM interview_answers WHERE question_id = $1`, sa.QuestionID,
@@ -562,43 +431,38 @@ func (h *AIHandler) persistScoredAnswers(scored []services.ScoredAnswer, session
 		if err != nil {
 			continue
 		}
-<<<<<<< HEAD
-
-		database.DB.Exec(
-			`UPDATE interview_answers SET score = $1 WHERE id = $2`, sa.Score, answerID,
-		)
-
-		database.DB.Exec(
-=======
 		_, _ = database.DB.Exec(
 			`UPDATE interview_answers SET score = $1 WHERE id = $2`, sa.Score, answerID,
 		)
 		_, _ = database.DB.Exec(
->>>>>>> 7d7c34f000c23813729e54fda65e92601914768c
 			`INSERT INTO interview_feedback (answer_id, feedback_text, strengths, improvements)
 			 VALUES ($1, $2, $3, $4)`,
 			answerID, sa.Feedback, sa.Strengths, sa.Improvements,
 		)
 	}
-<<<<<<< HEAD
-
-	if len(req.Items) > 0 {
-		overallScore = overallScore / float64(len(req.Items))
-	}
-
-	database.DB.Exec(
-		`UPDATE interview_sessions SET overall_score = $1 WHERE id = $2`,
-		overallScore, sessionID,
-	)
-
-	c.JSON(http.StatusOK, gin.H{"scored_answers": scoredAnswers, "overall_score": overallScore, "source": "ai"})
-=======
 	*overall = total / float64(len(scored))
 	_, _ = database.DB.Exec(
 		`UPDATE interview_sessions SET overall_score = $1 WHERE id = $2`,
 		*overall, sessionID,
 	)
->>>>>>> 7d7c34f000c23813729e54fda65e92601914768c
+}
+
+func (h *AIHandler) SaveEvaluation(c *gin.Context) {
+	sessionID := c.Param("id")
+
+	var req SaveEvaluationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(req.Items) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No evaluation items"})
+		return
+	}
+
+	var overall float64
+	h.persistScoredAnswers(req.Items, sessionID, &overall)
+	c.JSON(http.StatusOK, gin.H{"message": "Evaluation saved", "overall_score": overall})
 }
 
 func (h *AIHandler) GetFeedback(c *gin.Context) {
@@ -620,21 +484,12 @@ func (h *AIHandler) GetFeedback(c *gin.Context) {
 	defer rows.Close()
 
 	type FeedbackItem struct {
-<<<<<<< HEAD
-		Question    string  `json:"question"`
-		Answer      string  `json:"answer"`
-		Score       *float64 `json:"score"`
-		Feedback    string  `json:"feedback"`
-		Strengths   string  `json:"strengths"`
-		Improvements string `json:"improvements"`
-=======
 		Question    string   `json:"question"`
 		Answer      string   `json:"answer"`
 		Score       *float64 `json:"score"`
 		Feedback    string   `json:"feedback"`
 		Strengths   string   `json:"strengths"`
 		Improvements string  `json:"improvements"`
->>>>>>> 7d7c34f000c23813729e54fda65e92601914768c
 	}
 
 	var items []FeedbackItem
@@ -656,11 +511,7 @@ func (h *AIHandler) buildQuestionPrompt(jobRole, interviewType string, num int) 
 	return fmt.Sprintf("Generate %d realistic behavioral interview questions for a %s position. Use STAR method scenarios covering teamwork, leadership, conflict, and problem-solving. Return as a JSON array of strings.", num, jobRole)
 }
 
-<<<<<<< HEAD
-func (h *AIHandler) buildScorePrompt(jobRole, interviewType string, items []ScoreAnswerItem) string {
-=======
 func (h *AIHandler) buildScorePrompt(jobRole, interviewType string, items []services.ScoreAnswerItem) string {
->>>>>>> 7d7c34f000c23813729e54fda65e92601914768c
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("Evaluate these %s interview answers for a %s position:\n\n", interviewType, jobRole))
 	for i, item := range items {
@@ -748,8 +599,6 @@ func (h *AIHandler) fallbackScore(answer string) float64 {
 		return 4.0
 	}
 }
-<<<<<<< HEAD
-=======
 
 func cleanAIJSON(content string) string {
 	content = strings.TrimPrefix(content, "```json")
@@ -757,4 +606,3 @@ func cleanAIJSON(content string) string {
 	content = strings.TrimSuffix(content, "```")
 	return strings.TrimSpace(content)
 }
->>>>>>> 7d7c34f000c23813729e54fda65e92601914768c

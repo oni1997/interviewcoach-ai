@@ -31,8 +31,6 @@ type EvaluateAnswerRequest struct {
 	Role       string `json:"role"`
 }
 
-<<<<<<< HEAD
-=======
 type ScoreAnswerItem struct {
 	QuestionID string `json:"question_id"`
 	Question   string `json:"question"`
@@ -47,7 +45,6 @@ type ScoredAnswer struct {
 	Improvements string  `json:"improvements"`
 }
 
->>>>>>> 7d7c34f000c23813729e54fda65e92601914768c
 type GeminiRequest struct {
 	Contents []Content `json:"contents"`
 }

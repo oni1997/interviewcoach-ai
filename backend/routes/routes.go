@@ -43,6 +43,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 	api.POST("/sessions/:id/questions", middleware.AuthRequired(cfg), interview.AddQuestions)
 	api.POST("/sessions/:id/answers", middleware.AuthRequired(cfg), interview.SubmitAnswers)
 	api.POST("/sessions/:id/score", middleware.AuthRequired(cfg), ai.ScoreAnswers)
+	api.POST("/sessions/:id/evaluation", middleware.AuthRequired(cfg), ai.SaveEvaluation)
 	api.GET("/sessions/:id/feedback", middleware.AuthRequired(cfg), ai.GetFeedback)
 
 	api.GET("/dashboard/stats", middleware.AuthRequired(cfg), dashboard.GetStats)
@@ -50,13 +51,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 	api.POST("/profile/resume", middleware.AuthRequired(cfg), profile.UploadResume)
 	api.DELETE("/profile/resume", middleware.AuthRequired(cfg), profile.DeleteResume)
 
-<<<<<<< HEAD
-	api.POST("/ai/generate-questions", ai.GenerateQuestions)
-	api.POST("/ai/evaluate", ai.EvaluateAnswer)
-=======
 	api.POST("/ai/generate-questions", middleware.AuthRequired(cfg), ai.GenerateQuestions)
 	api.POST("/ai/evaluate", middleware.AuthRequired(cfg), ai.EvaluateAnswer)
->>>>>>> 7d7c34f000c23813729e54fda65e92601914768c
 	api.POST("/auth/forgot-password", auth.ForgotPassword)
 
 	return r

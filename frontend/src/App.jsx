@@ -25,6 +25,13 @@ export default function App() {
   const [currentSession, setCurrentSession] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
+  const [currentQIndex, setCurrentQIndex] = useState(0);
+  const [currentAnswer, setCurrentAnswer] = useState('');
+  const [currentAttempt, setCurrentAttempt] = useState(1);
+  const [aiFeedback, setAiFeedback] = useState(null);
+  const [evaluating, setEvaluating] = useState(false);
+  const [evaluations, setEvaluations] = useState([]);
+  const [results, setResults] = useState(null);
   const [resetEmail, setResetEmail] = useState('');
 
   const [profileForm, setProfileForm] = useState({ headline: '', bio: '', target_role: '', experience_level: '', skills: '' });
@@ -202,6 +209,12 @@ export default function App() {
       setCurrentSession(sessionRes.data);
       setQuestions(sessionRes.data.questions || []);
       setAnswers({});
+      setCurrentQIndex(0);
+      setCurrentAnswer('');
+      setCurrentAttempt(1);
+      setAiFeedback(null);
+      setEvaluations([]);
+      setResults(null);
       setScreen('interview');
     } catch (err) {
       setError('Failed to create interview session');
@@ -210,31 +223,125 @@ export default function App() {
   };
 
   const handleTranscript = (questionId, text) => {
-    setAnswers(prev => ({ ...prev, [questionId]: text }));
+    if (questionId === questions[currentQIndex]?.id) {
+      setCurrentAnswer(text);
+    }
   };
 
-  const submitInterview = async () => {
-    if (!currentSession) return;
-    try {
-      const answerPayload = Object.entries(answers).map(([question_id, answer_text]) => ({
-        question_id,
-        answer_text,
-      }));
-      if (answerPayload.length === 0) {
-        setError('Please answer at least one question');
-        setTimeout(() => setError(''), 2000);
-        return;
-      }
-      await api.post(`/sessions/${currentSession.id}/answers`, { answers: answerPayload });
-      setScreen('dashboard');
-      setCurrentSession(null);
-      setQuestions([]);
-      setAnswers({});
-      fetchDashboardData();
-    } catch (err) {
-      setError('Failed to submit answers');
+  const submitAnswer = async () => {
+    if (!currentSession || evaluating) return;
+    const q = questions[currentQIndex];
+    if (!currentAnswer.trim()) {
+      setError('Please type an answer before submitting');
       setTimeout(() => setError(''), 2000);
+      return;
     }
+    setEvaluating(true);
+    setError('');
+    try {
+      const res = await api.post('/ai/evaluate', {
+        question: q.question_text,
+        answer: currentAnswer,
+        role: role,
+      });
+      setAiFeedback({
+        score: Number(res.data.score) || 0,
+        feedback: res.data.feedback || 'No feedback provided.',
+        strengths: res.data.strengths || [],
+        weaknesses: res.data.weaknesses || [],
+        answer: currentAnswer,
+        attempt: currentAttempt,
+      });
+    } catch (err) {
+      setError('AI evaluation failed. Please try again.');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setEvaluating(false);
+    }
+  };
+
+  const tryAgain = () => {
+    setCurrentAttempt(2);
+    setAiFeedback(null);
+    setCurrentAnswer('');
+    setAnswers((prev) => ({ ...prev, [questions[currentQIndex].id]: '' }));
+  };
+
+  const nextQuestion = async () => {
+    const q = questions[currentQIndex];
+    const finalFeedback = aiFeedback || {
+      score: 0,
+      feedback: 'Not evaluated',
+      strengths: [],
+      weaknesses: [],
+      answer: currentAnswer || '',
+      attempt: currentAttempt,
+    };
+
+    const updated = [
+      ...evaluations,
+      {
+        question_id: q.id,
+        question: q.question_text,
+        score: finalFeedback.score,
+        feedback: finalFeedback.feedback,
+        strengths: Array.isArray(finalFeedback.strengths) ? finalFeedback.strengths.join('; ') : String(finalFeedback.strengths || ''),
+        improvements: Array.isArray(finalFeedback.weaknesses) ? finalFeedback.weaknesses.join('; ') : String(finalFeedback.weaknesses || ''),
+        answer: finalFeedback.answer,
+      },
+    ];
+    setEvaluations(updated);
+
+    if (currentQIndex + 1 >= questions.length) {
+      await finishInterview(updated);
+    } else {
+      setCurrentQIndex((i) => i + 1);
+      setCurrentAnswer('');
+      setCurrentAttempt(1);
+      setAiFeedback(null);
+    }
+  };
+
+  const finishInterview = async (finalEvals) => {
+    if (!currentSession) return;
+    const evals = finalEvals || evaluations;
+    try {
+      const answerPayload = evals.map((e) => ({
+        question_id: e.question_id,
+        answer_text: e.answer || '',
+      }));
+      await api.post(`/sessions/${currentSession.id}/answers`, { answers: answerPayload });
+      await api.post(`/sessions/${currentSession.id}/evaluation`, {
+        items: evals.map((e) => ({
+          question_id: e.question_id,
+          score: e.score,
+          feedback: e.feedback,
+          strengths: e.strengths,
+          improvements: e.improvements,
+        })),
+      });
+    } catch (err) {
+      console.error('Failed to save session results:', err);
+    }
+    const total = evals.reduce((sum, e) => sum + (Number(e.score) || 0), 0);
+    const avg = evals.length ? Math.round(total / evals.length) : 0;
+    setResults({ items: evals, overall: avg });
+    setCurrentSession(null);
+    setQuestions([]);
+    setAnswers({});
+    setAiFeedback(null);
+    setScreen('results');
+    fetchDashboardData();
+  };
+
+  const restartInterview = () => {
+    setResults(null);
+    setEvaluations([]);
+    setCurrentQIndex(0);
+    setCurrentAnswer('');
+    setCurrentAttempt(1);
+    setSelectedRole(null);
+    setScreen('dashboard');
   };
 
   useEffect(() => {
@@ -248,8 +355,6 @@ export default function App() {
 
 return (
     <div id="app-root-container" className="min-h-screen text-white flex flex-col justify-between font-sans relative" style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 40%, #c026d3 70%, #2563eb 100%)', minHeight: '100vh', color: '#ffffff' }}>
-      <header className="p-5 flex justify-between items-center" style={{ backgroundColor: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(16px)', borderBottom: '2px solid rgba(255, 255, 255, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
       <header className="app-header" style={{ backgroundColor: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(16px)', borderBottom: '2px solid rgba(255, 255, 255, 0.25)' }}>
         <div className="header-brand" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ backgroundColor: '#06b6d4', padding: '10px', borderRadius: '14px', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(6, 182, 212, 0.6)' }}>
@@ -263,13 +368,11 @@ return (
           </div>
         </div>
 
-        <div>
         <div className="header-right">
           <DarkModeToggle />
         </div>
       </header>
 
-      <main style={{ display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
       <main className="main-content" style={{ display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
         {screen === 'login' && (
           <div className="login-layout" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '64px', maxWidth: '1100px', width: '100%' }}>
@@ -284,7 +387,6 @@ return (
                 <p style={{ fontSize: '18px', color: '#f3e8ff', margin: 0, lineHeight: '1.5', fontWeight: '500' }}>Log in to practice your interview performance and access custom telemetry maps.</p>
               </div>
             </div>
-            <div style={{ maxWidth: '460px', width: '100%' }}>
             <div className="login-form-wrap" style={{ maxWidth: '460px', width: '100%' }}>
               <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
                 <h3 style={{ fontSize: '26px', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0' }}>Initialize Session</h3>
@@ -358,8 +460,6 @@ return (
         )}
 
         {screen === 'dashboard' && (
-          <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ width: '100%', maxWidth: '1000px', backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', padding: '40px', boxShadow: '0 25px 60px rgba(0,0,0,0.6)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid rgba(255,255,255,0.25)', paddingBottom: '28px', marginBottom: '40px' }}>
           <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)] page-wrap-xl" style={{ width: '100%', backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', padding: '40px', boxShadow: '0 25px 60px rgba(0,0,0,0.6)' }}>
             <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid rgba(255,255,255,0.25)', paddingBottom: '28px', marginBottom: '40px' }}>
               <div>
@@ -370,7 +470,6 @@ return (
                   <span style={{ fontSize: '13px', fontFamily: 'monospace', fontWeight: '900', backgroundColor: '#2563eb', color: '#ffffff', padding: '4px 14px', borderRadius: '9999px', border: '1px solid #ffffff', boxShadow: '0 4px 10px rgba(37,99,235,0.4)' }}>{role}</span>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
               <div className="dashboard-buttons" style={{ display: 'flex', gap: '10px' }}>
                 <button onClick={() => { setScreen('profile'); setError(''); setSuccess(''); }} style={{ backgroundColor: '#8b5cf6', color: '#ffffff', fontWeight: '800', padding: '14px 28px', borderRadius: '14px', fontSize: '14px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', boxShadow: '0 4px 14px rgba(139,92,246,0.4)' }}>Profile</button>
                 <button onClick={() => { setScreen('history'); setError(''); }} style={{ backgroundColor: '#3b82f6', color: '#ffffff', fontWeight: '800', padding: '14px 28px', borderRadius: '14px', fontSize: '14px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', boxShadow: '0 4px 14px rgba(59,130,246,0.4)' }}>History</button>
@@ -378,16 +477,6 @@ return (
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '32px' }}>
-              <div style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', textAlign: 'center' }}>
-                <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0 0 8px 0', fontWeight: '700' }}>Total Sessions</p>
-                <p style={{ fontSize: '36px', fontWeight: '900', color: '#3b82f6', margin: 0 }}>{stats.total_sessions}</p>
-              </div>
-              <div style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', textAlign: 'center' }}>
-                <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0 0 8px 0', fontWeight: '700' }}>Completed</p>
-                <p style={{ fontSize: '36px', fontWeight: '900', color: '#10b981', margin: 0 }}>{stats.completed_sessions}</p>
-              </div>
-              <div style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', textAlign: 'center' }}>
             <div className="dashboard-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '32px' }}>
               <div className="stat-card" style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', textAlign: 'center' }}>
                 <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0 0 8px 0', fontWeight: '700' }}>Total Sessions</p>
@@ -405,8 +494,6 @@ return (
 
             {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '28px' }}>
-              <div onClick={() => startInterview('behavioral')} style={{ backgroundColor: '#0f172a', padding: '32px', borderRadius: '20px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', cursor: 'pointer', transition: 'transform 0.2s' }}>
             <div className="dashboard-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '28px' }}>
               <div className="interview-card" onClick={() => startInterview('behavioral')} style={{ backgroundColor: '#0f172a', padding: '32px', borderRadius: '20px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', cursor: 'pointer', transition: 'transform 0.2s' }}>
                 <div>
@@ -416,7 +503,6 @@ return (
                 <div style={{ marginTop: '32px', textAlign: 'center', fontSize: '14px', fontWeight: '900', color: '#ffffff', backgroundColor: '#4f46e5', padding: '12px', borderRadius: '10px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.4)' }}>START SESSION →</div>
               </div>
 
-              <div onClick={() => startInterview('technical')} style={{ backgroundColor: '#0f172a', padding: '32px', borderRadius: '20px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', cursor: 'pointer', transition: 'transform 0.2s' }}>
               <div className="interview-card" onClick={() => startInterview('technical')} style={{ backgroundColor: '#0f172a', padding: '32px', borderRadius: '20px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', cursor: 'pointer', transition: 'transform 0.2s' }}>
                 <div>
                   <h4 style={{ fontWeight: '900', color: '#ffffff', fontSize: '20px', margin: '0 0 10px 0' }}>Technical Workspace</h4>
@@ -437,7 +523,6 @@ return (
         )}
 
         {screen === 'profile' && (
-          <div style={{ maxWidth: '600px', width: '100%' }}>
           <div className="page-wrap-md" style={{ width: '100%' }}>
             <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0' }}>Edit Profile</h2>
@@ -472,9 +557,6 @@ return (
                   <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', fontWeight: '800' }}>Skills</label>
                   <input type="text" value={profileForm.skills} onChange={(e) => setProfileForm({ ...profileForm, skills: e.target.value })} placeholder="e.g., Python, React, System Design" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} />
                 </div>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <button type="submit" style={{ flex: 1, background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)' }}>Save Profile</button>
-                  <button type="button" onClick={() => setScreen('dashboard')} style={{ flex: 1, backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>Cancel</button>
                 <div className="btn-group" style={{ display: 'flex', gap: '12px' }}>
                   <button type="submit" style={{ flex: 1, background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)' }}>Save Profile</button>
                   <button type="button" onClick={() => setScreen('dashboard')} className="btn-cancel" style={{ flex: 1, backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>Cancel</button>
@@ -489,7 +571,6 @@ return (
         )}
 
         {screen === 'history' && (
-          <div style={{ width: '100%', maxWidth: '800px' }}>
           <div className="page-wrap-lg" style={{ width: '100%' }}>
             <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', margin: '0 0 28px 0' }}>Interview History</h2>
@@ -498,7 +579,6 @@ return (
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {history.map((session) => (
-                    <div key={session.id} style={{ backgroundColor: '#0f172a', padding: '20px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div key={session.id} className="history-item" style={{ backgroundColor: '#0f172a', padding: '20px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <p style={{ fontSize: '16px', fontWeight: '700', color: '#ffffff', margin: '0 0 4px 0' }}>{session.role_title || 'Unknown Role'}</p>
@@ -522,7 +602,6 @@ return (
         )}
 
         {screen === 'interview-setup' && (
-          <div style={{ maxWidth: '500px', width: '100%' }}>
           <div className="page-wrap-sm" style={{ width: '100%' }}>
             <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0' }}>New {selectedType === 'technical' ? 'Technical' : 'Behavioral'} Interview</h2>
@@ -535,9 +614,6 @@ return (
                   </button>
                 ))}
               </div>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button onClick={createSession} disabled={!selectedRole} style={{ flex: 1, background: selectedRole ? 'linear-gradient(to right, #2563eb, #06b6d4)' : '#475569', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: selectedRole ? 'pointer' : 'not-allowed', fontSize: '16px', boxShadow: selectedRole ? '0 6px 20px rgba(37, 99, 235, 0.5)' : 'none' }}>Start Interview</button>
-                <button onClick={() => { setScreen('dashboard'); setSelectedRole(null); }} style={{ flex: 1, backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>Cancel</button>
               <div className="btn-group" style={{ display: 'flex', gap: '12px' }}>
                 <button onClick={createSession} disabled={!selectedRole} style={{ flex: 1, background: selectedRole ? 'linear-gradient(to right, #2563eb, #06b6d4)' : '#475569', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: selectedRole ? 'pointer' : 'not-allowed', fontSize: '16px', boxShadow: selectedRole ? '0 6px 20px rgba(37, 99, 235, 0.5)' : 'none' }}>Start Interview</button>
                 <button onClick={() => { setScreen('dashboard'); setSelectedRole(null); }} className="btn-cancel" style={{ flex: 1, backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>Cancel</button>
@@ -547,40 +623,125 @@ return (
         )}
 
         {screen === 'interview' && (
-          <div style={{ width: '100%', maxWidth: '800px' }}>
           <div className="page-wrap-lg" style={{ width: '100%' }}>
             <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0' }}>{selectedType === 'technical' ? 'Technical' : 'Behavioral'} Interview</h2>
-              <p style={{ fontSize: '15px', color: '#cbd5e1', margin: '0 0 28px 0' }}>Answer each question below, then submit when ready.</p>
+              <p style={{ fontSize: '15px', color: '#cbd5e1', margin: '0 0 28px 0' }}>
+                Question {currentQIndex + 1} of {questions.length} · Attempt {currentAttempt} of 2
+              </p>
               {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                {questions.map((q, idx) => (
-                  <div key={q.id} style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)' }}>
-                  <div key={q.id} className="question-card" style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)' }}>
-                    <p style={{ fontSize: '16px', fontWeight: '800', color: '#38bdf8', margin: '0 0 8px 0', fontFamily: 'monospace' }}>QUESTION {idx + 1}</p>
-                    <p style={{ fontSize: '17px', fontWeight: '600', color: '#ffffff', margin: '0 0 16px 0', lineHeight: '1.5' }}>{q.question_text}</p>
-                    <textarea value={answers[q.id] || ''} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} placeholder="Type your answer here..." rows={4} className="answer-textarea" style={{ width: '100%', backgroundColor: '#1e293b', border: '2px solid #475569', borderRadius: '12px', padding: '14px', color: '#ffffff', fontSize: '15px', fontWeight: '500', resize: 'vertical' }} />
-                    <VoiceRecorder
-                      questionId={q.id}
-                      onTranscript={handleTranscript}
-                      initialText={answers[q.id] || ''}
-                    />
+
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '28px' }}>
+                {questions.map((_, idx) => (
+                  <div key={idx} style={{ flex: 1, height: '8px', borderRadius: '6px', backgroundColor: idx <= currentQIndex ? '#06b6d4' : 'rgba(255,255,255,0.15)' }} />
+                ))}
+              </div>
+
+              {questions[currentQIndex] && (
+                <div className="question-card" style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)' }}>
+                  <p style={{ fontSize: '16px', fontWeight: '800', color: '#38bdf8', margin: '0 0 8px 0', fontFamily: 'monospace' }}>QUESTION {currentQIndex + 1}</p>
+                  <p style={{ fontSize: '17px', fontWeight: '600', color: '#ffffff', margin: '0 0 16px 0', lineHeight: '1.5' }}>{questions[currentQIndex].question_text}</p>
+
+                  {!aiFeedback ? (
+                    <>
+                      <textarea value={currentAnswer} onChange={(e) => setCurrentAnswer(e.target.value)} placeholder={`Your answer (${currentAttempt === 1 ? 'first' : 'second'} attempt)...`} rows={5} className="answer-textarea" style={{ width: '100%', backgroundColor: '#1e293b', border: '2px solid #475569', borderRadius: '12px', padding: '14px', color: '#ffffff', fontSize: '15px', fontWeight: '500', resize: 'vertical' }} />
+                      <VoiceRecorder
+                        questionId={questions[currentQIndex].id}
+                        onTranscript={handleTranscript}
+                        initialText={currentAnswer}
+                      />
+                      <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                        <button onClick={submitAnswer} disabled={evaluating} style={{ flex: 1, background: 'linear-gradient(to right, #2563eb, #06b6d4)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: evaluating ? 'wait' : 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(37, 99, 235, 0.5)' }}>
+                          {evaluating ? 'Evaluating...' : currentAttempt === 1 ? 'Submit Answer' : 'Submit Improved Answer'}
+                        </button>
+                        <button onClick={() => { setScreen('dashboard'); setCurrentSession(null); setQuestions([]); }} className="btn-cancel" style={{ backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px 24px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>Quit</button>
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ marginTop: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+                        <div style={{ width: '84px', height: '84px', borderRadius: '50%', border: `6px solid ${aiFeedback.score >= 70 ? '#10b981' : aiFeedback.score >= 40 ? '#eab308' : '#ef4444'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, backgroundColor: '#0f172a' }}>
+                          <span style={{ fontSize: '22px', fontWeight: '900', color: '#ffffff' }}>{aiFeedback.score}%</span>
+                        </div>
+                        <div>
+                          <p style={{ fontSize: '15px', fontWeight: '900', color: '#ffffff', margin: 0 }}>AI Feedback</p>
+                          <p style={{ fontSize: '13px', color: '#94a3b8', margin: '4px 0 0 0' }}>Attempt {aiFeedback.attempt} of 2</p>
+                        </div>
+                      </div>
+
+                      <div style={{ backgroundColor: '#1e293b', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.15)', marginBottom: '16px' }}>
+                        <p style={{ fontSize: '15px', color: '#e2e8f0', margin: 0, lineHeight: '1.6', fontWeight: '500' }}>{aiFeedback.feedback}</p>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                        <div style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.4)' }}>
+                          <p style={{ fontSize: '13px', fontWeight: '900', color: '#10b981', margin: '0 0 8px 0', textTransform: 'uppercase' }}>Strengths</p>
+                          {(Array.isArray(aiFeedback.strengths) ? aiFeedback.strengths : []).map((s, i) => (
+                            <p key={i} style={{ fontSize: '14px', color: '#d1fae5', margin: '0 0 6px 0', fontWeight: '500' }}>• {s}</p>
+                          ))}
+                        </div>
+                        <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.4)' }}>
+                          <p style={{ fontSize: '13px', fontWeight: '900', color: '#f87171', margin: '0 0 8px 0', textTransform: 'uppercase' }}>Improve</p>
+                          {(Array.isArray(aiFeedback.weaknesses) ? aiFeedback.weaknesses : []).map((w, i) => (
+                            <p key={i} style={{ fontSize: '14px', color: '#fee2e2', margin: '0 0 6px 0', fontWeight: '500' }}>• {w}</p>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        {currentAttempt === 1 && (
+                          <button onClick={tryAgain} style={{ flex: 1, background: 'linear-gradient(to right, #8b5cf6, #d946ef)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(139, 92, 246, 0.5)' }}>
+                            Improve My Answer
+                          </button>
+                        )}
+                        <button onClick={nextQuestion} style={{ flex: 1, background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)' }}>
+                          {currentQIndex + 1 >= questions.length ? 'Finish Interview' : 'Next Question'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {screen === 'results' && results && (
+          <div className="page-wrap-lg" style={{ width: '100%' }}>
+            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
+              <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0', textAlign: 'center' }}>Interview Results</h2>
+              <p style={{ fontSize: '15px', color: '#cbd5e1', textAlign: 'center', margin: '0 0 28px 0' }}>Your performance on this {selectedType === 'technical' ? 'Technical' : 'Behavioral'} interview</p>
+
+              <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+                <div style={{ width: '140px', height: '140px', borderRadius: '50%', border: `10px solid ${results.overall >= 70 ? '#10b981' : results.overall >= 40 ? '#eab308' : '#ef4444'}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0f172a', boxShadow: '0 10px 30px rgba(0,0,0,0.4)' }}>
+                  <span style={{ fontSize: '40px', fontWeight: '900', color: '#ffffff' }}>{results.overall}%</span>
+                </div>
+                <p style={{ fontSize: '16px', color: '#94a3b8', margin: '16px 0 0 0', fontWeight: '700' }}>
+                  {results.overall >= 70 ? 'Great job! You are interview-ready.' : results.overall >= 40 ? 'Good effort! Keep practicing to improve.' : 'Keep practicing — review the feedback below.'}
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '28px' }}>
+                {results.items.map((e, i) => (
+                  <div key={e.question_id} style={{ backgroundColor: '#0f172a', padding: '20px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <p style={{ fontSize: '14px', fontWeight: '800', color: '#38bdf8', margin: 0, fontFamily: 'monospace' }}>QUESTION {i + 1}</p>
+                      <span style={{ fontSize: '18px', fontWeight: '900', color: e.score >= 70 ? '#10b981' : e.score >= 40 ? '#eab308' : '#ef4444' }}>{Math.round(e.score)}%</span>
+                    </div>
+                    <p style={{ fontSize: '15px', fontWeight: '600', color: '#ffffff', margin: '0 0 10px 0', lineHeight: '1.5' }}>{e.question}</p>
+                    {e.feedback && <p style={{ fontSize: '14px', color: '#cbd5e1', margin: 0, lineHeight: '1.6', fontWeight: '500' }}>{e.feedback}</p>}
                   </div>
                 ))}
               </div>
-              <div style={{ display: 'flex', gap: '12px', marginTop: '28px' }}>
-                <button onClick={submitInterview} style={{ flex: 1, background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)' }}>Submit Answers</button>
-                <button onClick={() => setScreen('dashboard')} style={{ backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px 24px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>Cancel</button>
-              <div className="btn-group" style={{ display: 'flex', gap: '12px', marginTop: '28px' }}>
-                <button onClick={submitInterview} style={{ flex: 1, background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)' }}>Submit Answers</button>
-                <button onClick={() => setScreen('dashboard')} className="btn-cancel" style={{ backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>Cancel</button>
+
+              <div className="btn-group" style={{ display: 'flex', gap: '12px' }}>
+                <button onClick={restartInterview} style={{ flex: 1, background: 'linear-gradient(to right, #2563eb, #06b6d4)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(37, 99, 235, 0.5)' }}>Back to Dashboard</button>
               </div>
             </div>
           </div>
         )}
 
         {screen === 'forgot-password' && (
-          <div style={{ maxWidth: '460px', width: '100%' }}>
           <div className="login-form-wrap" style={{ maxWidth: '460px', width: '100%' }}>
             <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', textAlign: 'center', margin: '0 0 6px 0' }}>Reset Password</h2>
