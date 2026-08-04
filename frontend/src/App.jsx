@@ -28,6 +28,7 @@ export default function App() {
 
   const [profileForm, setProfileForm] = useState({ headline: '', bio: '', target_role: '', experience_level: '', skills: '' });
   const [isDarkMode, setIsDarkMode] = React.useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!document.getElementById('tailwind-cdn-fallback')) {
@@ -128,12 +129,6 @@ export default function App() {
     } catch (err) {
       setError('Invalid credentials');
     }
-
-    <div style={{ textAlign: 'right', marginTop: '-10px' }}>
-      <button type="button" onClick={() => { setScreen('forgot-password'); setError(''); setSuccess(''); }} style={{ color: '#38bdf8', background: 'none', border: 'none', padding: 0, fontSize: '13px', cursor: 'pointer', textDecoration: 'underline', fontWeight: '600' }}>
-        Forgot password?
-      </button>
-    </div>
   };
 
   const handleLogout = () => {
@@ -142,6 +137,7 @@ export default function App() {
     setProfile(null);
     setHistory([]);
     setStats({ total_sessions: 0, completed_sessions: 0, average_score: null });
+    setMobileMenuOpen(false);
   };
 
   const handleForgotPassword = async (e) => {
@@ -241,9 +237,13 @@ export default function App() {
     }
   }, []);
 
-return (
-    <div id="app-root-container" className="min-h-screen text-white flex flex-col justify-between font-sans relative" style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 40%, #c026d3 70%, #2563eb 100%)', minHeight: '100vh', color: '#ffffff' }}>
-      <header className="p-5 flex justify-between items-center" style={{ backgroundColor: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(16px)', borderBottom: '2px solid rgba(255, 255, 255, 0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+  const isAuthenticated = screen !== 'login' && screen !== 'register' && screen !== 'forgot-password';
+
+  return (
+    <div id="app-root-container" className="min-h-screen text-white flex flex-col justify-between font-sans relative" style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 40%, #c026d3 70%, #2563eb 100%)', minHeight: '100vh', color: '#ffffff', overflowX: 'hidden' }}>
+
+      {/* Desktop Header*/}
+      <header className="hidden md:flex p-5 justify-between items-center" style={{ backgroundColor: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(16px)', borderBottom: '2px solid rgba(255, 255, 255, 0.25)', width: '100%', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ backgroundColor: '#06b6d4', padding: '10px', borderRadius: '14px', width: '48px', height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(6, 182, 212, 0.6)' }}>
             <svg style={{ width: '28px', height: '28px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -256,38 +256,86 @@ return (
           </div>
         </div>
 
-        <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          {isAuthenticated && (
+            <>
+              <button onClick={() => { setScreen('profile'); setError(''); setSuccess(''); }} style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '15px', fontWeight: '700', cursor: 'pointer' }}>Profile</button>
+              <button onClick={() => { setScreen('history'); setError(''); }} style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '15px', fontWeight: '700', cursor: 'pointer' }}>History</button>
+              <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#f43f5e', fontSize: '15px', fontWeight: '700', cursor: 'pointer' }}>Logout</button>
+            </>
+          )}
           <DarkModeToggle />
         </div>
       </header>
 
-      <main style={{ display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
+      {/* Mobile Navigation Header*/}
+      <header className="md:hidden flex justify-between items-center" style={{ padding: '16px 20px', backgroundColor: '#0f172a', borderBottom: '2px solid rgba(255,255,255,0.1)', width: '100%', boxSizing: 'border-box' }}>
+        <h1 style={{ fontSize: '18px', fontWeight: '800', color: '#ffffff', margin: 0 }}>InterviewCoach AI</h1>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <DarkModeToggle />
+          {isAuthenticated && (
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              style={{ background: 'none', border: '2px solid rgba(255,255,255,0.3)', borderRadius: '8px', color: '#ffffff', padding: '8px 12px', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold' }}
+            >
+              {mobileMenuOpen ? '✕' : '☰'}
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* Collapsible Mobile Menu Dropdown*/}
+      {mobileMenuOpen && isAuthenticated && (
+        <nav className="md:hidden flex flex-col" style={{ backgroundColor: '#0f172a', padding: '16px 20px', gap: '12px', borderBottom: '2px solid rgba(255,255,255,0.1)', width: '100%', boxSizing: 'border-box' }}>
+          <button
+            onClick={() => { setScreen('profile'); setMobileMenuOpen(false); setError(''); setSuccess(''); }}
+            style={{ background: 'none', border: 'none', color: '#38bdf8', textAlign: 'left', fontSize: '16px', fontWeight: '700', cursor: 'pointer', padding: '6px 0' }}
+          >
+            Profile
+          </button>
+          <button
+            onClick={() => { setScreen('history'); setMobileMenuOpen(false); setError(''); }}
+            style={{ background: 'none', border: 'none', color: '#38bdf8', textAlign: 'left', fontSize: '16px', fontWeight: '700', cursor: 'pointer', padding: '6px 0' }}
+          >
+            History
+          </button>
+          <button
+            onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+            style={{ background: 'none', border: 'none', color: '#f43f5e', textAlign: 'left', fontSize: '16px', fontWeight: '700', cursor: 'pointer', padding: '6px 0' }}
+          >
+            Logout
+          </button>
+        </nav>
+      )}
+
+      <main style={{ display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: '40px 16px', width: '100%', boxSizing: 'border-box' }}>
         {screen === 'login' && (
-          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '64px', maxWidth: '1100px', width: '100%' }} className="flex flex-col lg:flex-row items-center justify-center">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '28px', maxWidth: '550px', textAlign: 'left' }}>
+          <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '64px', maxWidth: '1100px', width: '100%', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '28px', maxWidth: '550px', width: '100%', textAlign: 'left', flexWrap: 'wrap' }}>
               <div style={{ width: '140px', height: '140px', borderRadius: '28px', backgroundColor: 'rgba(255, 255, 255, 0.15)', backdropFilter: 'blur(10px)', border: '3px solid #ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', flexShrink: 0, boxShadow: '0 15px 35px rgba(0,0,0,0.3)' }}>
                 <svg style={{ width: '80px', height: '80px', color: '#ffffff' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 5h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2zM9 9h.01M15 9h.01M9 13h.01M15 13h.01M9 17h6" />
                 </svg>
               </div>
-              <div>
-                <h2 style={{ fontSize: '40px', fontWeight: '900', color: '#ffffff', lineHeight: '1.15', margin: '0 0 12px 0', letterSpacing: '-1px', textShadow: '0 4px 15px rgba(0,0,0,0.25)' }}>AI-Powered Interview Practice for Everyone</h2>
+              <div style={{ flex: 1, minWidth: '260px' }}>
+                <h2 style={{ fontSize: 'clamp(28px, 4vw, 40px)', fontWeight: '900', color: '#ffffff', lineHeight: '1.15', margin: '0 0 12px 0', letterSpacing: '-1px', textShadow: '0 4px 15px rgba(0,0,0,0.25)' }}>AI-Powered Interview Practice for Everyone</h2>
                 <p style={{ fontSize: '18px', color: '#f3e8ff', margin: 0, lineHeight: '1.5', fontWeight: '500' }}>Log in to practice your interview performance and access custom telemetry maps.</p>
               </div>
             </div>
-            <div style={{ maxWidth: '460px', width: '100%' }}>
-              <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
+            <div style={{ maxWidth: '460px', width: '100%', boxSizing: 'border-box' }}>
+              <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: 'clamp(20px, 4vw, 40px)', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)', width: '100%', boxSizing: 'border-box' }}>
                 <h3 style={{ fontSize: '26px', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0' }}>Initialize Session</h3>
                 <p style={{ fontSize: '14px', color: '#cbd5e1', margin: '0 0 28px 0' }}>Enter system credentials to activate standard validation metrics</p>
                 {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
                 <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', letterSpacing: '0.75px', fontWeight: '800' }}>User Identity (Email)</label>
-                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@test.com" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} required />
+                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@test.com" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600', boxSizing: 'border-box' }} required />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', letterSpacing: '0.75px', fontWeight: '800' }}>Security Cipher (Password)</label>
-                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} required />
+                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600', boxSizing: 'border-box' }} required />
                   </div>
 
                   <div style={{ textAlign: 'right', marginTop: '-10px', marginBottom: '-5px' }}>
@@ -300,7 +348,7 @@ return (
                     </button>
                   </div>
 
-                  <button type="submit" style={{ width: '100%', background: 'linear-gradient(to right, #2563eb, #06b6d4)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', marginTop: '10px', fontSize: '17px', boxShadow: '0 6px 20px rgba(37, 99, 235, 0.5)' }}>Authenticate Access</button>
+                  <button type="submit" style={{ width: '100%', background: 'linear-gradient(to right, #2563eb, #06b6d4)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', marginTop: '10px', fontSize: '17px', boxShadow: '0 6px 20px rgba(37, 99, 235, 0.5)', boxSizing: 'border-box' }}>Authenticate Access</button>
                 </form>
                 <p style={{ fontSize: '15px', textAlign: 'center', color: '#cbd5e1', marginTop: '28px', marginBottom: 0, fontWeight: '500' }}>
                   New evaluation candidate? <button onClick={() => { setScreen('register'); setError(''); }} style={{ color: '#38bdf8', background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer', textDecoration: 'underline', fontWeight: '700' }}>Create Account</button>
@@ -311,8 +359,8 @@ return (
         )}
 
         {screen === 'register' && (
-          <div style={{ maxWidth: '460px', width: '100%' }}>
-            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
+          <div style={{ maxWidth: '460px', width: '100%', boxSizing: 'border-box' }}>
+            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: 'clamp(20px, 4vw, 40px)', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)', width: '100%', boxSizing: 'border-box' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', textAlign: 'center', margin: '0 0 6px 0' }}>Provision Profile</h2>
               <p style={{ fontSize: '15px', color: '#cbd5e1', textAlign: 'center', margin: '0 0 28px 0' }}>Register metrics to the evaluation network</p>
               {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
@@ -320,11 +368,11 @@ return (
               <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', fontWeight: '800' }}>Candidate Full Name</label>
-                  <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g., Jane Doe" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} required />
+                  <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="e.g., Jane Doe" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600', boxSizing: 'border-box' }} required />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', fontWeight: '800' }}>Target Evaluation Track</label>
-                  <select value={role} onChange={(e) => setRole(e.target.value)} style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }}>
+                  <select value={role} onChange={(e) => setRole(e.target.value)} style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600', boxSizing: 'border-box' }}>
                     <option value="Software Engineer">Software Engineer (Core Technical)</option>
                     <option value="Product Manager">Product Manager (Strategic Strategy)</option>
                     <option value="Data Scientist">Data Scientist (Machine Learning Matrices)</option>
@@ -332,13 +380,13 @@ return (
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', fontWeight: '800' }}>System Email Account</label>
-                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@domain.com" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} required />
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@domain.com" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600', boxSizing: 'border-box' }} required />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', fontWeight: '800' }}>Access Password</label>
-                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} required />
+                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600', boxSizing: 'border-box' }} required />
                 </div>
-                <button type="submit" style={{ width: '100%', background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', marginTop: '10px', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)' }}>Create Account</button>
+                <button type="submit" style={{ width: '100%', background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', marginTop: '10px', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)', boxSizing: 'border-box' }}>Create Account</button>
               </form>
               <p style={{ fontSize: '15px', textAlign: 'center', color: '#cbd5e1', marginTop: '28px', marginBottom: 0, fontWeight: '500' }}>
                 Already registered? <button onClick={() => { setScreen('login'); setError(''); }} style={{ color: '#6ee7b7', background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer', textDecoration: 'underline', fontWeight: '700' }}>Return to Verification</button>
@@ -348,24 +396,19 @@ return (
         )}
 
         {screen === 'dashboard' && (
-          <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ width: '100%', maxWidth: '1000px', backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', padding: '40px', boxShadow: '0 25px 60px rgba(0,0,0,0.6)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid rgba(255,255,255,0.25)', paddingBottom: '28px', marginBottom: '40px' }}>
+          <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ width: '100%', maxWidth: '1000px', backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', padding: 'clamp(20px, 4vw, 40px)', boxShadow: '0 25px 60px rgba(0,0,0,0.6)', boxSizing: 'border-box' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid rgba(255,255,255,0.25)', paddingBottom: '28px', marginBottom: '40px', flexWrap: 'wrap', gap: '20px' }}>
               <div>
                 <p style={{ fontSize: '13px', fontFamily: 'monospace', color: '#cbd5e1', fontWeight: '900', textTransform: 'uppercase', margin: '0 0 6px 0', letterSpacing: '1.5px' }}>Interactive Coaching Matrix Active</p>
-                <h2 style={{ fontSize: '42px', fontWeight: '900', color: '#ffffff', margin: 0, letterSpacing: '-0.5px', textShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>Welcome, {fullName}!</h2>
-                <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <h2 style={{ fontSize: 'clamp(28px, 4vw, 42px)', fontWeight: '900', color: '#ffffff', margin: 0, letterSpacing: '-0.5px', textShadow: '0 2px 10px rgba(0,0,0,0.3)' }}>Welcome, {fullName}!</h2>
+                <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '15px', color: '#ffffff', fontWeight: '600' }}>Target Track:</span>
                   <span style={{ fontSize: '13px', fontFamily: 'monospace', fontWeight: '900', backgroundColor: '#2563eb', color: '#ffffff', padding: '4px 14px', borderRadius: '9999px', border: '1px solid #ffffff', boxShadow: '0 4px 10px rgba(37,99,235,0.4)' }}>{role}</span>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => { setScreen('profile'); setError(''); setSuccess(''); }} style={{ backgroundColor: '#8b5cf6', color: '#ffffff', fontWeight: '800', padding: '14px 28px', borderRadius: '14px', fontSize: '14px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', boxShadow: '0 4px 14px rgba(139,92,246,0.4)' }}>Profile</button>
-                <button onClick={() => { setScreen('history'); setError(''); }} style={{ backgroundColor: '#3b82f6', color: '#ffffff', fontWeight: '800', padding: '14px 28px', borderRadius: '14px', fontSize: '14px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', boxShadow: '0 4px 14px rgba(59,130,246,0.4)' }}>History</button>
-                <button onClick={handleLogout} style={{ backgroundColor: '#ef4444', color: '#ffffff', fontWeight: '800', padding: '14px 28px', borderRadius: '14px', fontSize: '14px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', boxShadow: '0 4px 14px rgba(239,68,68,0.4)' }}>Logout</button>
-              </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '32px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
               <div style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', textAlign: 'center' }}>
                 <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0 0 8px 0', fontWeight: '700' }}>Total Sessions</p>
                 <p style={{ fontSize: '36px', fontWeight: '900', color: '#3b82f6', margin: 0 }}>{stats.total_sessions}</p>
@@ -411,8 +454,8 @@ return (
         )}
 
         {screen === 'profile' && (
-          <div style={{ maxWidth: '600px', width: '100%' }}>
-            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
+          <div style={{ maxWidth: '600px', width: '100%', boxSizing: 'border-box' }}>
+            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: 'clamp(20px, 4vw, 40px)', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)', width: '100%', boxSizing: 'border-box' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0' }}>Edit Profile</h2>
               <p style={{ fontSize: '15px', color: '#cbd5e1', margin: '0 0 28px 0' }}>Update your interview profile information</p>
               {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
@@ -420,19 +463,19 @@ return (
               <form onSubmit={handleUpdateProfile} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', fontWeight: '800' }}>Headline</label>
-                  <input type="text" value={profileForm.headline} onChange={(e) => setProfileForm({ ...profileForm, headline: e.target.value })} placeholder="e.g., Senior Software Engineer" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} />
+                  <input type="text" value={profileForm.headline} onChange={(e) => setProfileForm({ ...profileForm, headline: e.target.value })} placeholder="e.g., Senior Software Engineer" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600', boxSizing: 'border-box' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', fontWeight: '800' }}>Bio</label>
-                  <textarea value={profileForm.bio} onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })} placeholder="Tell us about yourself..." rows={4} style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600', resize: 'vertical' }} />
+                  <textarea value={profileForm.bio} onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })} placeholder="Tell us about yourself..." rows={4} style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600', resize: 'vertical', boxSizing: 'border-box' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', fontWeight: '800' }}>Target Role</label>
-                  <input type="text" value={profileForm.target_role} onChange={(e) => setProfileForm({ ...profileForm, target_role: e.target.value })} placeholder="e.g., Backend Developer" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} />
+                  <input type="text" value={profileForm.target_role} onChange={(e) => setProfileForm({ ...profileForm, target_role: e.target.value })} placeholder="e.g., Backend Developer" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600', boxSizing: 'border-box' }} />
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', fontWeight: '800' }}>Experience Level</label>
-                  <select value={profileForm.experience_level} onChange={(e) => setProfileForm({ ...profileForm, experience_level: e.target.value })} style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }}>
+                  <select value={profileForm.experience_level} onChange={(e) => setProfileForm({ ...profileForm, experience_level: e.target.value })} style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600', boxSizing: 'border-box' }}>
                     <option value="">Select level</option>
                     <option value="entry">Entry Level</option>
                     <option value="mid">Mid Level</option>
@@ -443,11 +486,11 @@ return (
 
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', fontWeight: '800' }}>Skills</label>
-                  <input type="text" value={profileForm.skills} onChange={(e) => setProfileForm({ ...profileForm, skills: e.target.value })} placeholder="e.g., Python, React, System Design" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} />
+                  <input type="text" value={profileForm.skills} onChange={(e) => setProfileForm({ ...profileForm, skills: e.target.value })} placeholder="e.g., Python, React, System Design" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600', boxSizing: 'border-box' }} />
                 </div>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <button type="submit" style={{ flex: 1, background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)' }}>Save Profile</button>
-                  <button type="button" onClick={() => setScreen('dashboard')} style={{ flex: 1, backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>Cancel</button>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <button type="submit" style={{ flex: 1, minWidth: '130px', background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)', boxSizing: 'border-box' }}>Save Profile</button>
+                  <button type="button" onClick={() => setScreen('dashboard')} style={{ flex: 1, minWidth: '130px', backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxSizing: 'border-box' }}>Cancel</button>
                 </div>
               </form>
 
@@ -459,15 +502,15 @@ return (
         )}
 
         {screen === 'history' && (
-          <div style={{ width: '100%', maxWidth: '800px' }}>
-            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
+          <div style={{ width: '100%', maxWidth: '800px', boxSizing: 'border-box' }}>
+            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: 'clamp(20px, 4vw, 40px)', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)', width: '100%', boxSizing: 'border-box' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', margin: '0 0 28px 0' }}>Interview History</h2>
               {history.length === 0 ? (
                 <p style={{ color: '#94a3b8', textAlign: 'center', fontSize: '16px' }}>No interview sessions yet. Start one from the dashboard!</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {history.map((session) => (
-                    <div key={session.id} style={{ backgroundColor: '#0f172a', padding: '20px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div key={session.id} style={{ backgroundColor: '#0f172a', padding: '20px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                       <div>
                         <p style={{ fontSize: '16px', fontWeight: '700', color: '#ffffff', margin: '0 0 4px 0' }}>{session.role_title || 'Unknown Role'}</p>
                         <p style={{ fontSize: '13px', color: '#94a3b8', margin: 0, fontFamily: 'monospace' }}>
@@ -484,14 +527,14 @@ return (
                   ))}
                 </div>
               )}
-              <button onClick={() => setScreen('dashboard')} style={{ width: '100%', marginTop: '24px', backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>Back to Dashboard</button>
+              <button onClick={() => setScreen('dashboard')} style={{ width: '100%', marginTop: '24px', backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxSizing: 'border-box' }}>Back to Dashboard</button>
             </div>
           </div>
         )}
 
         {screen === 'interview-setup' && (
-          <div style={{ maxWidth: '500px', width: '100%' }}>
-            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
+          <div style={{ maxWidth: '500px', width: '100%', boxSizing: 'border-box' }}>
+            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: 'clamp(20px, 4vw, 40px)', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)', width: '100%', boxSizing: 'border-box' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0' }}>New {selectedType === 'technical' ? 'Technical' : 'Behavioral'} Interview</h2>
               <p style={{ fontSize: '15px', color: '#cbd5e1', margin: '0 0 28px 0' }}>Select a job role for this session</p>
               {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
@@ -502,51 +545,51 @@ return (
                   </button>
                 ))}
               </div>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button onClick={createSession} disabled={!selectedRole} style={{ flex: 1, background: selectedRole ? 'linear-gradient(to right, #2563eb, #06b6d4)' : '#475569', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: selectedRole ? 'pointer' : 'not-allowed', fontSize: '16px', boxShadow: selectedRole ? '0 6px 20px rgba(37, 99, 235, 0.5)' : 'none' }}>Start Interview</button>
-                <button onClick={() => { setScreen('dashboard'); setSelectedRole(null); }} style={{ flex: 1, backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>Cancel</button>
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <button onClick={createSession} disabled={!selectedRole} style={{ flex: 1, minWidth: '130px', background: selectedRole ? 'linear-gradient(to right, #2563eb, #06b6d4)' : '#475569', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: selectedRole ? 'pointer' : 'not-allowed', fontSize: '16px', boxShadow: selectedRole ? '0 6px 20px rgba(37, 99, 235, 0.5)' : 'none', boxSizing: 'border-box' }}>Start Interview</button>
+                <button onClick={() => { setScreen('dashboard'); setSelectedRole(null); }} style={{ flex: 1, minWidth: '130px', backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxSizing: 'border-box' }}>Cancel</button>
               </div>
             </div>
           </div>
         )}
 
         {screen === 'interview' && (
-          <div style={{ width: '100%', maxWidth: '800px' }}>
-            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
+          <div style={{ width: '100%', maxWidth: '800px', boxSizing: 'border-box' }}>
+            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: 'clamp(20px, 4vw, 40px)', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)', width: '100%', boxSizing: 'border-box' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0' }}>{selectedType === 'technical' ? 'Technical' : 'Behavioral'} Interview</h2>
               <p style={{ fontSize: '15px', color: '#cbd5e1', margin: '0 0 28px 0' }}>Answer each question below, then submit when ready.</p>
               {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 {questions.map((q, idx) => (
-                  <div key={q.id} style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)' }}>
+                  <div key={q.id} style={{ backgroundColor: '#0f172a', padding: '24px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', boxSizing: 'border-box' }}>
                     <p style={{ fontSize: '16px', fontWeight: '800', color: '#38bdf8', margin: '0 0 8px 0', fontFamily: 'monospace' }}>QUESTION {idx + 1}</p>
                     <p style={{ fontSize: '17px', fontWeight: '600', color: '#ffffff', margin: '0 0 16px 0', lineHeight: '1.5' }}>{q.question_text}</p>
-                    <textarea value={answers[q.id] || ''} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} placeholder="Type your answer here..." rows={4} style={{ width: '100%', backgroundColor: '#1e293b', border: '2px solid #475569', borderRadius: '12px', padding: '14px', color: '#ffffff', fontSize: '15px', fontWeight: '500', resize: 'vertical' }} />
+                    <textarea value={answers[q.id] || ''} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} placeholder="Type your answer here..." rows={4} style={{ width: '100%', backgroundColor: '#1e293b', border: '2px solid #475569', borderRadius: '12px', padding: '14px', color: '#ffffff', fontSize: '15px', fontWeight: '500', resize: 'vertical', boxSizing: 'border-box' }} />
                   </div>
                 ))}
               </div>
-              <div style={{ display: 'flex', gap: '12px', marginTop: '28px' }}>
-                <button onClick={submitInterview} style={{ flex: 1, background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)' }}>Submit Answers</button>
-                <button onClick={() => setScreen('dashboard')} style={{ backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px 24px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px' }}>Cancel</button>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '28px', flexWrap: 'wrap' }}>
+                <button onClick={submitInterview} style={{ flex: 1, minWidth: '130px', background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)', boxSizing: 'border-box' }}>Submit Answers</button>
+                <button onClick={() => setScreen('dashboard')} style={{ backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px 24px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxSizing: 'border-box' }}>Cancel</button>
               </div>
             </div>
           </div>
         )}
 
         {screen === 'forgot-password' && (
-          <div style={{ maxWidth: '460px', width: '100%' }}>
-            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: '40px', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)' }}>
+          <div style={{ maxWidth: '460px', width: '100%', boxSizing: 'border-box' }}>
+            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: 'clamp(20px, 4vw, 40px)', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)', width: '100%', boxSizing: 'border-box' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', textAlign: 'center', margin: '0 0 6px 0' }}>Reset Password</h2>
               <p style={{ fontSize: '15px', color: '#cbd5e1', textAlign: 'center', margin: '0 0 28px 0' }}>Enter your account email to receive recovery instructions</p>
               {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
               {success && <div style={{ backgroundColor: '#10b981', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{success}</div>}
-              
+
               <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', textTransform: 'uppercase', color: '#f3e8ff', marginBottom: '8px', fontWeight: '800' }}>System Email Account</label>
-                  <input type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} placeholder="name@domain.com" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600' }} required />
+                  <input type="email" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} placeholder="name@domain.com" style={{ width: '100%', backgroundColor: '#0f172a', border: '2px solid #a855f7', borderRadius: '14px', padding: '16px', color: '#ffffff', fontSize: '16px', fontWeight: '600', boxSizing: 'border-box' }} required />
                 </div>
-                <button type="submit" style={{ width: '100%', background: 'linear-gradient(to right, #2563eb, #06b6d4)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', marginTop: '10px', fontSize: '16px', boxShadow: '0 6px 20px rgba(37, 99, 235, 0.5)' }}>Send Reset Link</button>
+                <button type="submit" style={{ width: '100%', background: 'linear-gradient(to right, #2563eb, #06b6d4)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', marginTop: '10px', fontSize: '16px', boxShadow: '0 6px 20px rgba(37, 99, 235, 0.5)', boxSizing: 'border-box' }}>Send Reset Link</button>
               </form>
 
               <p style={{ fontSize: '15px', textAlign: 'center', color: '#cbd5e1', marginTop: '28px', marginBottom: 0, fontWeight: '500' }}>
@@ -558,7 +601,7 @@ return (
 
       </main>
 
-      <footer style={{ textAlign: 'center', padding: '24px 16px', borderTop: '2px solid rgba(255,255,255,0.25)', color: '#ffffff', fontSize: '15px', fontFamily: 'monospace', backgroundColor: '#0f172a', letterSpacing: '0.5px', fontWeight: '700' }}>
+      <footer style={{ textAlign: 'center', padding: '24px 16px', borderTop: '2px solid rgba(255,255,255,0.25)', color: '#ffffff', fontSize: '15px', fontFamily: 'monospace', backgroundColor: '#0f172a', letterSpacing: '0.5px', fontWeight: '700', width: '100%', boxSizing: 'border-box' }}>
         &copy; {new Date().getFullYear()} InterviewCoach AI
       </footer>
     </div>

@@ -1,2 +1,17 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
+
+
+@media (min-width: 768px) {
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  /* Make all container cards fit neatly on mobile screens without overflowing */
+  .app-card-box {
+    padding: 24px 16px !important;
+    border-radius: 20px !important;
+  }
+}

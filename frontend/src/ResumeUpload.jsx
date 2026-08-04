@@ -168,7 +168,7 @@ const hasResume = profile && profile.resume_text;
             onClick={handleDeleteResume}
             style={{ backgroundColor: '#ef4444', color: '#ffffff', fontWeight: '800', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.3)', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap', boxShadow: '0 4px 14px rgba(239,68,68,0.4)' }}
           >
-            Delete
+            Delete Resume
           </button>
         </div>
       )}
