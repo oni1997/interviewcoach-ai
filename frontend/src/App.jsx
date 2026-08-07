@@ -470,9 +470,9 @@ export default function App() {
     setVoicePhase('question');
     setCountdown(60);
     setVoiceMainIdx(0);
-    setVoiceMainIdxRef(0);
+    voiceMainIdxRef.current = 0;
     setVoiceIsFollowUp(false);
-    setVoiceIsFollowUpRef(false);
+    voiceIsFollowUpRef.current = false;
     setEvaluations([]);
     evaluationsRef.current = [];
     convHistoryRef.current = [];
