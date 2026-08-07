@@ -114,10 +114,8 @@ export default function VoiceRecorder({
       };
 
       recognition.onerror = (event) => {
-        if (event.error === 'no-speech') return;
-        if (event.error === 'aborted') return;
-        setError(event.error);
-        stopAll();
+        if (event.error === 'no-speech' || event.error === 'aborted') return;
+        setError('Speech recognition issue — keep speaking, still recording');
       };
 
       recognition.onend = () => {
@@ -185,9 +183,7 @@ export default function VoiceRecorder({
   useEffect(() => {
     if (stopSignal > 0 && stopSignal !== lastStopRef.current) {
       lastStopRef.current = stopSignal;
-      if (listeningRef.current) {
-        stopAll();
-      }
+      stopAll();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stopSignal]);

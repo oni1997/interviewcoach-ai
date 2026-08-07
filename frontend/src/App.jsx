@@ -58,6 +58,7 @@ export default function App() {
   const currentSessionRef = useRef(null);
   const roleRef = useRef('Software Engineer');
   const typeRef = useRef('');
+  const retriedForRef = useRef(null);
 
   useEffect(() => { questionsRef.current = questions; }, [questions]);
   useEffect(() => { evaluationsRef.current = evaluations; }, [evaluations]);
@@ -481,7 +482,12 @@ export default function App() {
     setCurrentSession(null);
     setAiFeedback(null);
     setCurrentAnswer('');
+    retriedForRef.current = null;
     try {
+      try {
+        const warm = await navigator.mediaDevices.getUserMedia({ audio: true });
+        warm.getTracks().forEach((t) => t.stop());
+      } catch (e) { /* mic permission will be handled by the recorder */ }
       const res = await api.post('/sessions', { interview_type: 'behavioral' });
       setCurrentSession(res.data);
       currentSessionRef.current = res.data;
@@ -543,6 +549,16 @@ export default function App() {
     const q = questionsRef.current[currentQIdxRef.current];
     const answer = (transcript || '').trim();
     setCurrentAnswer(answer);
+    if (!answer && retriedForRef.current !== q.id) {
+      retriedForRef.current = q.id;
+      setVoicePhase('question');
+      setEvaluating(false);
+      speak("Sorry, I didn't catch that. Please speak again.", () => {
+        voiceBusyRef.current = false;
+        voiceBeginAnswer();
+      });
+      return;
+    }
     try {
       let fb;
       if (!answer) {
@@ -587,27 +603,29 @@ export default function App() {
         });
       } else {
         let fupText = '';
-        try {
-          const fupRes = await api.post('/ai/follow-up', {
-            question: q.question_text,
-            answer: fb.answer,
-            job_role: roleRef.current,
-            interview_type: typeRef.current || 'behavioral',
-            session_id: currentSessionRef.current.id,
-            history: convHistoryRef.current,
-          });
-          fupText = fupRes.data.question;
-          if (fupRes.data.question_id) {
-            pushVoiceQuestion({
-              id: fupRes.data.question_id,
-              question_text: fupText,
-              question_order: questionsRef.current.length + 1,
+        if (answer) {
+          try {
+            const fupRes = await api.post('/ai/follow-up', {
+              question: q.question_text,
+              answer,
+              job_role: roleRef.current,
+              interview_type: typeRef.current || 'behavioral',
+              session_id: currentSessionRef.current.id,
+              history: convHistoryRef.current,
             });
-            currentQIdxRef.current = questionsRef.current.length - 1;
-            setCurrentQIndex(currentQIdxRef.current);
+            fupText = fupRes.data.question;
+            if (fupRes.data.question_id) {
+              pushVoiceQuestion({
+                id: fupRes.data.question_id,
+                question_text: fupText,
+                question_order: questionsRef.current.length + 1,
+              });
+              currentQIdxRef.current = questionsRef.current.length - 1;
+              setCurrentQIndex(currentQIdxRef.current);
+            }
+          } catch (err) {
+            fupText = '';
           }
-        } catch (err) {
-          fupText = '';
         }
         convHistoryRef.current = [...convHistoryRef.current, { question: q.question_text, answer: fb.answer }];
         setConversationHistory(convHistoryRef.current);
@@ -667,6 +685,13 @@ export default function App() {
     }, 1000);
     return () => clearInterval(iv);
   }, [screen, voicePhase]);
+
+  useEffect(() => {
+    if (screen === 'voice-interview' && voicePhase === 'answer' && countdown <= 0) {
+      voiceStop();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countdown, screen, voicePhase]);
 
   const restartInterview = () => {
     setResults(null);
