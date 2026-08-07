@@ -767,6 +767,7 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           {isAuthenticated && (
             <>
+              <button onClick={() => { setScreen('dashboard'); fetchDashboardData(); setError(''); }} style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '15px', fontWeight: '700', cursor: 'pointer' }}>Home</button>
               <button onClick={() => { setScreen('profile'); setError(''); setSuccess(''); }} style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '15px', fontWeight: '700', cursor: 'pointer' }}>Profile</button>
               <button onClick={() => { setScreen('history'); setError(''); }} style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '15px', fontWeight: '700', cursor: 'pointer' }}>History</button>
               <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: '#f43f5e', fontSize: '15px', fontWeight: '700', cursor: 'pointer' }}>Logout</button>
@@ -796,6 +797,12 @@ export default function App() {
       {/* Collapsible Mobile Menu Dropdown */}
       {mobileMenuOpen && isAuthenticated && (
         <nav className="md:hidden flex flex-col" style={{ backgroundColor: '#0f172a', padding: '16px 20px', gap: '12px', borderBottom: '2px solid rgba(255,255,255,0.1)', width: '100%', boxSizing: 'border-box' }}>
+          <button
+            onClick={() => { setScreen('dashboard'); fetchDashboardData(); setMobileMenuOpen(false); setError(''); }}
+            style={{ background: 'none', border: 'none', color: '#38bdf8', textAlign: 'left', fontSize: '16px', fontWeight: '700', cursor: 'pointer', padding: '6px 0' }}
+          >
+            Home
+          </button>
           <button
             onClick={() => { setScreen('profile'); setMobileMenuOpen(false); setError(''); setSuccess(''); }}
             style={{ background: 'none', border: 'none', color: '#38bdf8', textAlign: 'left', fontSize: '16px', fontWeight: '700', cursor: 'pointer', padding: '6px 0' }}
