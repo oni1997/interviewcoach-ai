@@ -36,6 +36,9 @@ export default function App() {
   const [viewSessionDetail, setViewSessionDetail] = useState([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
+  const [voiceOn, setVoiceOn] = useState(true);
+  const [conversationHistory, setConversationHistory] = useState([]);
+  const [askingFollowUp, setAskingFollowUp] = useState(false);
 
   const [profileForm, setProfileForm] = useState({ headline: '', bio: '', target_role: '', experience_level: '', skills: '' });
   const [isDarkMode, setIsDarkMode] = React.useState(false);
@@ -242,6 +245,70 @@ export default function App() {
     }
   };
 
+  const speak = (text) => {
+    if (!voiceOn || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      utterance.voice = voices.find((v) => v.lang.startsWith('en')) || voices[0];
+    }
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const stopSpeaking = () => {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+  };
+
+  useEffect(() => {
+    if (screen === 'interview' && questions[currentQIndex] && aiFeedback === null) {
+      const t = setTimeout(() => speak(questions[currentQIndex].question_text), 600);
+      return () => { clearTimeout(t); };
+    }
+  }, [screen, currentQIndex, questions, aiFeedback, voiceOn]);
+
+  const askFollowUp = async () => {
+    if (!currentSession || askingFollowUp) return;
+    const q = questions[currentQIndex];
+    const answer = aiFeedback?.answer || currentAnswer;
+    if (!answer.trim()) {
+      setError('Please answer the question before continuing the conversation.');
+      setTimeout(() => setError(''), 2500);
+      return;
+    }
+    setAskingFollowUp(true);
+    setError('');
+    try {
+      const res = await api.post('/ai/follow-up', {
+        question: q.question_text,
+        answer,
+        job_role: role,
+        interview_type: selectedType,
+        history: conversationHistory,
+      });
+      const followUp = res.data.question;
+      if (!followUp) throw new Error('Empty follow-up');
+
+      const historyTurn = { question: q.question_text, answer };
+      setConversationHistory([...conversationHistory, historyTurn]);
+
+      const newQuestion = { id: `followup-${Date.now()}`, question_text: followUp, question_order: questions.length + 1 };
+      setQuestions([...questions, newQuestion]);
+      setCurrentQIndex(questions.length);
+      setCurrentAnswer('');
+      setCurrentAttempt(1);
+      setAiFeedback(null);
+      setError('');
+    } catch (err) {
+      setError('Failed to generate follow-up question. Try again.');
+      setTimeout(() => setError(''), 2500);
+    } finally {
+      setAskingFollowUp(false);
+    }
+  };
+
   const submitAnswer = async () => {
     if (!currentSession || evaluating) return;
     const q = questions[currentQIndex];
@@ -344,6 +411,8 @@ export default function App() {
     setQuestions([]);
     setAnswers({});
     setAiFeedback(null);
+    setConversationHistory([]);
+    stopSpeaking();
     setScreen('results');
     fetchDashboardData();
   };
@@ -355,6 +424,8 @@ export default function App() {
     setCurrentAnswer('');
     setCurrentAttempt(1);
     setSelectedRole(null);
+    setConversationHistory([]);
+    stopSpeaking();
     setScreen('dashboard');
   };
 
@@ -572,12 +643,12 @@ export default function App() {
                 <div style={{ marginTop: '32px', textAlign: 'center', fontSize: '14px', fontWeight: '900', color: '#ffffff', backgroundColor: '#06b6d4', padding: '12px', borderRadius: '10px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.4)' }}>START SESSION →</div>
               </div>
 
-              <div style={{ backgroundColor: '#0f172a', padding: '32px', borderRadius: '20px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 10px 20px rgba(0,0,0,0.3)' }}>
+              <div onClick={() => startInterview('behavioral')} style={{ backgroundColor: '#0f172a', padding: '32px', borderRadius: '20px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', cursor: 'pointer', transition: 'transform 0.2s' }}>
                 <div>
                   <h4 style={{ fontWeight: '900', color: '#ffffff', fontSize: '20px', margin: '0 0 10px 0' }}>Vocal AI Simulation</h4>
-                  <p style={{ fontSize: '15px', color: '#e2e8f0', margin: 0, lineHeight: '1.6', fontWeight: '500' }}>Speech-to-text validation engines analyzing cadence and presentation timelines.</p>
+                  <p style={{ fontSize: '15px', color: '#e2e8f0', margin: 0, lineHeight: '1.6', fontWeight: '500' }}>Speech-to-text validation engines analyzing cadence and presentation timelines. Answer questions using your voice.</p>
                 </div>
-                <div style={{ marginTop: '32px', textAlign: 'center', fontSize: '12px', fontWeight: '900', color: '#ffffff', backgroundColor: '#10b981', padding: '10px', borderRadius: '10px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.4)' }}>PIPELINE LOCKED</div>
+                <div style={{ marginTop: '32px', textAlign: 'center', fontSize: '14px', fontWeight: '900', color: '#ffffff', backgroundColor: '#10b981', padding: '12px', borderRadius: '10px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.4)' }}>START VOICE SESSION →</div>
               </div>
             </div>
           </div>
@@ -758,9 +829,17 @@ export default function App() {
           <div style={{ width: '100%', maxWidth: '900px', boxSizing: 'border-box' }}>
             <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: 'clamp(20px, 4vw, 40px)', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)', width: '100%', boxSizing: 'border-box' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', margin: '0 0 6px 0' }}>{selectedType === 'technical' ? 'Technical' : 'Behavioral'} Interview</h2>
-              <p style={{ fontSize: '15px', color: '#cbd5e1', margin: '0 0 28px 0' }}>
+              <p style={{ fontSize: '15px', color: '#cbd5e1', margin: '0 0 12px 0' }}>
                 Question {currentQIndex + 1} of {questions.length} · Attempt {currentAttempt} of 2
               </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                <button onClick={() => { setVoiceOn((v) => !v); stopSpeaking(); }} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: voiceOn ? 'rgba(16, 185, 129, 0.2)' : '#334155', color: '#ffffff', fontWeight: '700', padding: '8px 14px', borderRadius: '10px', border: `1px solid ${voiceOn ? 'rgba(16, 185, 129, 0.6)' : 'rgba(255,255,255,0.3)'}`, cursor: 'pointer', fontSize: '13px' }}>
+                  {voiceOn ? 'Voice On' : 'Voice Off'}
+                </button>
+                <button onClick={() => speak(questions[currentQIndex]?.question_text)} disabled={!questions[currentQIndex]} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(56, 189, 248, 0.2)', color: '#ffffff', fontWeight: '700', padding: '8px 14px', borderRadius: '10px', border: '1px solid rgba(56, 189, 248, 0.6)', cursor: 'pointer', fontSize: '13px' }}>
+                  Read Question Aloud
+                </button>
+              </div>
               {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
 
               <div style={{ display: 'flex', gap: '10px', marginBottom: '28px' }}>
@@ -786,7 +865,7 @@ export default function App() {
                         <button onClick={submitAnswer} disabled={evaluating} style={{ flex: 1, minWidth: '160px', background: 'linear-gradient(to right, #2563eb, #06b6d4)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: evaluating ? 'wait' : 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(37, 99, 235, 0.5)', boxSizing: 'border-box' }}>
                           {evaluating ? 'Evaluating...' : currentAttempt === 1 ? 'Submit Answer' : 'Submit Improved Answer'}
                         </button>
-                        <button onClick={() => { setScreen('dashboard'); setCurrentSession(null); setQuestions([]); }} style={{ backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px 24px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxSizing: 'border-box' }}>Quit</button>
+                        <button onClick={() => { stopSpeaking(); setScreen('dashboard'); setCurrentSession(null); setQuestions([]); setConversationHistory([]); }} style={{ backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '16px 24px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxSizing: 'border-box' }}>Quit</button>
                       </div>
                     </>
                   ) : (
@@ -828,6 +907,9 @@ export default function App() {
                         )}
                         <button onClick={nextQuestion} style={{ flex: 1, minWidth: '140px', background: 'linear-gradient(to right, #10b981, #14b8a6)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(16, 185, 129, 0.5)', boxSizing: 'border-box' }}>
                           {currentQIndex + 1 >= questions.length ? 'Finish Interview' : 'Next Question'}
+                        </button>
+                        <button onClick={askFollowUp} disabled={askingFollowUp} style={{ flex: 1, minWidth: '140px', background: 'linear-gradient(to right, #8b5cf6, #06b6d4)', color: '#ffffff', fontWeight: '800', padding: '16px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.4)', cursor: askingFollowUp ? 'wait' : 'pointer', fontSize: '16px', boxShadow: '0 6px 20px rgba(139, 92, 246, 0.5)', boxSizing: 'border-box' }}>
+                          {askingFollowUp ? 'Thinking...' : 'Ask AI Follow-up'}
                         </button>
                       </div>
                     </div>

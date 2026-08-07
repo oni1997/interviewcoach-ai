@@ -67,6 +67,38 @@ type GeminiResponse struct {
 	} `json:"candidates"`
 }
 
+type ChatTurn struct {
+	Question string `json:"question"`
+	Answer   string `json:"answer"`
+}
+
+func GenerateFollowUpWithGemini(apiKey string, history []ChatTurn, lastQuestion, lastAnswer, role, interviewType string) (map[string]interface{}, error) {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("You are a %s interviewer conducting a %s interview for a %s candidate.\n\n", interviewType, interviewType, role))
+	for i, turn := range history {
+		sb.WriteString(fmt.Sprintf("Q%d: %s\nA%d: %s\n", i+1, turn.Question, i+1, turn.Answer))
+	}
+	sb.WriteString(fmt.Sprintf("Last question: %s\nLast answer: %s\n\n", lastQuestion, lastAnswer))
+	sb.WriteString(`Ask ONE natural follow-up question that probes deeper into the candidate's last answer (clarify details, challenge assumptions, or ask for an example). Do not repeat previous questions. Return ONLY valid JSON:
+{
+  "follow_up": "the follow-up question text"
+}`)
+
+	text, err := tryGeminiModels(apiKey, sb.String())
+	if err != nil {
+		return nil, err
+	}
+
+	cleaned := cleanJSONResponse(text)
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %v\nRaw text: %s", err, text)
+	}
+
+	return result, nil
+}
+
 func callGemini(apiKey, modelName, prompt string) (string, error) {
 	url := fmt.Sprintf(geminiAPIURL+"?key=%s", modelName, apiKey)
 

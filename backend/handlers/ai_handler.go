@@ -48,6 +48,19 @@ type SaveEvaluationRequest struct {
 	Items []services.ScoredAnswer `json:"items" binding:"required,min=1"`
 }
 
+type FollowUpRequest struct {
+	Question      string            `json:"question" binding:"required"`
+	Answer        string            `json:"answer" binding:"required"`
+	JobRole       string            `json:"job_role"`
+	InterviewType string            `json:"interview_type"`
+	History       []services.ChatTurn `json:"history"`
+}
+
+type FollowUpResponse struct {
+	Question string `json:"question"`
+	Source   string `json:"source"`
+}
+
 func (h *AIHandler) hasGemini() bool {
 	return h.Config != nil && h.Config.GEMINI_API_KEY != ""
 }
@@ -140,6 +153,139 @@ func (h *AIHandler) GenerateQuestions(c *gin.Context) {
 
 	// 4) Local fallback
 	c.JSON(http.StatusOK, gin.H{"questions": h.fallbackQuestions(role, interviewType, count), "source": "fallback"})
+}
+
+// FollowUpQuestion generates a conversational follow-up question based on the
+// candidate's previous answer. It supports Gemini, OpenAI, NVIDIA, and a local
+// fallback so the conversational mode works without any API key.
+func (h *AIHandler) FollowUpQuestion(c *gin.Context) {
+	var req FollowUpRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	role := req.JobRole
+	if role == "" {
+		role = "Software Engineer"
+	}
+	interviewType := req.InterviewType
+	if interviewType == "" {
+		interviewType = "behavioral"
+	}
+
+	// 1) Gemini
+	if h.hasGemini() {
+		q, err := h.followUpWithGemini(req, role, interviewType)
+		if err == nil {
+			c.JSON(http.StatusOK, FollowUpResponse{Question: q, Source: "gemini"})
+			return
+		}
+		fmt.Printf("⚠️  Gemini follow-up failed, falling back: %v\n", err)
+	}
+
+	// 2) OpenAI
+	if h.hasOpenAI() {
+		q, err := h.followUpWithOpenAI(req, role, interviewType)
+		if err == nil {
+			c.JSON(http.StatusOK, FollowUpResponse{Question: q, Source: "openai"})
+			return
+		}
+		fmt.Printf("⚠️  OpenAI follow-up failed, falling back: %v\n", err)
+	}
+
+	// 3) NVIDIA
+	if h.hasNVIDIA() {
+		q, err := h.followUpWithNVIDIA(req, role, interviewType)
+		if err == nil {
+			c.JSON(http.StatusOK, FollowUpResponse{Question: q, Source: "nvidia"})
+			return
+		}
+		fmt.Printf("⚠️  NVIDIA follow-up failed, falling back: %v\n", err)
+	}
+
+	// 4) Local fallback
+	c.JSON(http.StatusOK, FollowUpResponse{
+		Question: h.fallbackFollowUp(req.Question, req.Answer),
+		Source:   "fallback",
+	})
+}
+
+func (h *AIHandler) followUpPrompt(req FollowUpRequest, role, interviewType string) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("You are a %s interviewer conducting a %s interview for a %s candidate.\n\n", interviewType, interviewType, role))
+	for i, turn := range req.History {
+		sb.WriteString(fmt.Sprintf("Q%d: %s\nA%d: %s\n", i+1, turn.Question, i+1, turn.Answer))
+	}
+	sb.WriteString(fmt.Sprintf("Last question: %s\nLast answer: %s\n\n", req.Question, req.Answer))
+	sb.WriteString("Ask ONE natural follow-up question that probes deeper into the candidate's last answer (clarify details, challenge assumptions, or ask for an example). Do not repeat previous questions. Return ONLY the question text, no prefix, no quotes.")
+	return sb.String()
+}
+
+func (h *AIHandler) followUpWithOpenAI(req FollowUpRequest, role, interviewType string) (string, error) {
+	client := openai.NewClient(h.Config.AIKey)
+	resp, err := client.CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
+		Model: openai.GPT4oMini,
+		Messages: []openai.ChatCompletionMessage{
+			{Role: openai.ChatMessageRoleSystem, Content: "You are an expert interviewer conducting a live conversation. Generate a single follow-up question."},
+			{Role: openai.ChatMessageRoleUser, Content: h.followUpPrompt(req, role, interviewType)},
+		},
+		Temperature: 0.8,
+		MaxTokens:   300,
+	})
+	if err != nil {
+		return "", err
+	}
+	q := strings.TrimSpace(resp.Choices[0].Message.Content)
+	q = strings.TrimPrefix(q, `"`)
+	q = strings.TrimSuffix(q, `"`)
+	return q, nil
+}
+
+func (h *AIHandler) followUpWithNVIDIA(req FollowUpRequest, role, interviewType string) (string, error) {
+	client := h.nvidiaClient()
+	resp, err := client.CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
+		Model: h.Config.NVIDIA_MODEL,
+		Messages: []openai.ChatCompletionMessage{
+			{Role: openai.ChatMessageRoleSystem, Content: "You are an expert interviewer conducting a live conversation. Generate a single follow-up question."},
+			{Role: openai.ChatMessageRoleUser, Content: h.followUpPrompt(req, role, interviewType)},
+		},
+		Temperature: 0.8,
+		MaxTokens:   300,
+	})
+	if err != nil {
+		return "", err
+	}
+	q := strings.TrimSpace(resp.Choices[0].Message.Content)
+	q = strings.TrimPrefix(q, `"`)
+	q = strings.TrimSuffix(q, `"`)
+	return q, nil
+}
+
+func (h *AIHandler) followUpWithGemini(req FollowUpRequest, role, interviewType string) (string, error) {
+	result, err := services.GenerateFollowUpWithGemini(h.Config.GEMINI_API_KEY, req.History, req.Question, req.Answer, role, interviewType)
+	if err != nil {
+		return "", err
+	}
+	q, ok := result["follow_up"].(string)
+	if !ok || q == "" {
+		return "", fmt.Errorf("gemini returned empty follow-up")
+	}
+	return q, nil
+}
+
+func (h *AIHandler) fallbackFollowUp(question, answer string) string {
+	followUps := []string{
+		"Can you elaborate on a specific example from your answer?",
+		"What would you do differently if you could approach that again?",
+		"How does that experience connect to the role you are applying for?",
+		"Can you walk me through the steps you took to reach that outcome?",
+		"Was there a challenge you faced in that situation? How did you overcome it?",
+	}
+	if len(answer) < 80 {
+		return "Your answer was quite brief. Can you provide more detail and a concrete example?"
+	}
+	return followUps[len(question)%len(followUps)]
 }
 
 func (h *AIHandler) EvaluateAnswer(c *gin.Context) {

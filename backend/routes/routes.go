@@ -53,6 +53,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 
 	api.POST("/ai/generate-questions", middleware.AuthRequired(cfg), ai.GenerateQuestions)
 	api.POST("/ai/evaluate", middleware.AuthRequired(cfg), ai.EvaluateAnswer)
+	api.POST("/ai/follow-up", middleware.AuthRequired(cfg), ai.FollowUpQuestion)
 	api.POST("/auth/forgot-password", auth.ForgotPassword)
 
 	return r
