@@ -42,6 +42,8 @@ func Setup(cfg *config.Config) *gin.Engine {
 	api.GET("/sessions/:id", middleware.AuthRequired(cfg), interview.GetSession)
 	api.POST("/sessions/:id/questions", middleware.AuthRequired(cfg), interview.AddQuestions)
 	api.POST("/sessions/:id/answers", middleware.AuthRequired(cfg), interview.SubmitAnswers)
+	api.POST("/sessions/:id/recordings", middleware.AuthRequired(cfg), interview.UploadRecording)
+	api.GET("/sessions/:id/recordings/:question_id", middleware.AuthRequired(cfg), interview.GetRecording)
 	api.POST("/sessions/:id/score", middleware.AuthRequired(cfg), ai.ScoreAnswers)
 	api.POST("/sessions/:id/evaluation", middleware.AuthRequired(cfg), ai.SaveEvaluation)
 	api.GET("/sessions/:id/feedback", middleware.AuthRequired(cfg), ai.GetFeedback)
@@ -54,6 +56,7 @@ func Setup(cfg *config.Config) *gin.Engine {
 	api.POST("/ai/generate-questions", middleware.AuthRequired(cfg), ai.GenerateQuestions)
 	api.POST("/ai/evaluate", middleware.AuthRequired(cfg), ai.EvaluateAnswer)
 	api.POST("/ai/follow-up", middleware.AuthRequired(cfg), ai.FollowUpQuestion)
+	api.POST("/ai/transcribe", middleware.AuthRequired(cfg), ai.TranscribeAudio)
 	api.POST("/auth/forgot-password", auth.ForgotPassword)
 
 	return r

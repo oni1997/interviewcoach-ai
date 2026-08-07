@@ -33,6 +33,7 @@ services:
       AI_API_KEY: ${AI_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
       NVIDIA_MODEL: ${NVIDIA_MODEL:-google/diffusiongemma-26b-a4b-it}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       FRONTEND_URL: ${FRONTEND_URL:-https://interviewcoach-ai.mukai.co.za}

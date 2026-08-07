@@ -31,16 +31,18 @@ export default function VoiceRecorder({
   const doneFiredRef = useRef(false);
   const listeningRef = useRef(false);
   const lastStopRef = useRef(0);
+  const lastBlobRef = useRef(null);
+  const pendingStopRef = useRef(false);
 
   listeningRef.current = listening;
 
   const stopAllRef = useRef(null);
 
-  const fireDone = useCallback(() => {
+  const fireDone = useCallback((blob) => {
     if (doneFiredRef.current) return;
     doneFiredRef.current = true;
     const full = (transcriptRef.current + ' ' + interimRef.current).trim();
-    if (onDone) onDone(questionId, full);
+    if (onDone) onDone(questionId, full, blob || lastBlobRef.current || null);
   }, [questionId, onDone]);
 
   const stopAudio = useCallback(() => {
@@ -49,6 +51,13 @@ export default function VoiceRecorder({
       audioRef.current.currentTime = 0;
     }
     setPlaying(false);
+  }, []);
+
+  const releaseStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
   }, []);
 
   const cleanup = useCallback(() => {
@@ -63,18 +72,35 @@ export default function VoiceRecorder({
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       try { mediaRecorderRef.current.stop(); } catch (e) { /* ignore */ }
     }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-  }, []);
+    releaseStream();
+  }, [releaseStream]);
 
   const stopAll = useCallback(() => {
     setListening(false);
     setRecording(false);
-    cleanup();
-    fireDone();
-  }, [cleanup, fireDone]);
+    if (pendingStopRef.current) return;
+    pendingStopRef.current = true;
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch (e) { /* ignore */ }
+      recognitionRef.current = null;
+    }
+    const rec = mediaRecorderRef.current;
+    if (rec && rec.state === 'recording') {
+      try { rec.stop(); } catch (e) {
+        pendingStopRef.current = false;
+        releaseStream();
+        fireDone();
+      }
+    } else {
+      pendingStopRef.current = false;
+      releaseStream();
+      fireDone();
+    }
+  }, [cleanup, fireDone, releaseStream]);
 
   stopAllRef.current = stopAll;
 
@@ -136,10 +162,16 @@ export default function VoiceRecorder({
       mediaRecorder.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         audioChunksRef.current = [];
+        lastBlobRef.current = blob;
         const url = URL.createObjectURL(blob);
         if (audioUrl) URL.revokeObjectURL(audioUrl);
         setAudioUrl(url);
         setRecording(false);
+        releaseStream();
+        if (pendingStopRef.current) {
+          pendingStopRef.current = false;
+          fireDone(blob);
+        }
       };
       mediaRecorder.start();
       mediaRecorderRef.current = mediaRecorder;
@@ -160,7 +192,7 @@ export default function VoiceRecorder({
         setError('Microphone not available');
       }
     }
-  }, [questionId, onTranscript, listening, audioUrl, durationSeconds]);
+  }, [questionId, onTranscript, listening, audioUrl, durationSeconds, releaseStream, fireDone]);
 
   const begin = useCallback(() => {
     setError('');

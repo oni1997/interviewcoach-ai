@@ -18,6 +18,7 @@ type Config struct {
 	GEMINI_API_KEY string
 	NVIDIA_API_KEY string
 	NVIDIA_MODEL   string
+	GROQ_API_KEY   string
 }
 
 func Load() *Config {
@@ -39,6 +40,7 @@ func Load() *Config {
 		GEMINI_API_KEY: getEnv("GEMINI_API_KEY", ""),
 		NVIDIA_API_KEY: getEnv("NVIDIA_API_KEY", ""),
 		NVIDIA_MODEL:   getEnv("NVIDIA_MODEL", "google/diffusiongemma-26b-a4b-it"),
+		GROQ_API_KEY:   getEnv("GROQ_API_KEY", ""),
 	}
 }
 

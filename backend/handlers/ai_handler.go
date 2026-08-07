@@ -1,11 +1,15 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	openai "github.com/sashabaranov/go-openai"
@@ -652,8 +656,9 @@ func (h *AIHandler) GetFeedback(c *gin.Context) {
 	sessionID := c.Param("id")
 
 	rows, err := database.DB.Query(
-		`SELECT iq.question_text, ia.answer_text, ia.score,
-		        f.feedback_text, f.strengths, f.improvements
+		`SELECT iq.id, iq.question_text, ia.answer_text, ia.score,
+		        f.feedback_text, f.strengths, f.improvements,
+		        EXISTS(SELECT 1 FROM interview_recordings r WHERE r.question_id = iq.id)
 		 FROM interview_questions iq
 		 LEFT JOIN interview_answers ia ON ia.question_id = iq.id
 		 LEFT JOIN interview_feedback f ON f.answer_id = ia.id
@@ -667,23 +672,113 @@ func (h *AIHandler) GetFeedback(c *gin.Context) {
 	defer rows.Close()
 
 	type FeedbackItem struct {
+		QuestionID   string   `json:"question_id"`
 		Question     string   `json:"question"`
-		Answer       string   `json:"answer"`
+		Answer       *string  `json:"answer"`
 		Score        *float64 `json:"score"`
 		Feedback     *string  `json:"feedback"`
 		Strengths    *string  `json:"strengths"`
 		Improvements *string  `json:"improvements"`
+		HasRecording bool     `json:"has_recording"`
 	}
 
 	var items []FeedbackItem
 	for rows.Next() {
 		var fi FeedbackItem
-		_ = rows.Scan(&fi.Question, &fi.Answer, &fi.Score,
-			&fi.Feedback, &fi.Strengths, &fi.Improvements)
+		if err := rows.Scan(&fi.QuestionID, &fi.Question, &fi.Answer, &fi.Score,
+			&fi.Feedback, &fi.Strengths, &fi.Improvements, &fi.HasRecording); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read feedback"})
+			return
+		}
 		items = append(items, fi)
 	}
 
 	c.JSON(http.StatusOK, items)
+}
+
+// TranscribeAudio converts an uploaded audio clip into text using Groq-hosted
+// Whisper, so the app no longer depends on the browser's built-in recognition.
+func (h *AIHandler) TranscribeAudio(c *gin.Context) {
+	if h.Config.GROQ_API_KEY == "" {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "GROQ_API_KEY not configured"})
+		return
+	}
+
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No audio file uploaded"})
+		return
+	}
+	file, err := fileHeader.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open file"})
+		return
+	}
+	defer file.Close()
+
+	audioBytes, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read file"})
+		return
+	}
+	if len(audioBytes) == 0 || len(audioBytes) > 25*1024*1024 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid audio file size"})
+		return
+	}
+
+	text, err := h.transcribeWithGroq(audioBytes, fileHeader.Filename)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Transcription failed: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"text": text, "source": "groq"})
+}
+
+func (h *AIHandler) transcribeWithGroq(audio []byte, filename string) (string, error) {
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	part, err := writer.CreateFormFile("file", filename)
+	if err != nil {
+		return "", err
+	}
+	if _, err := part.Write(audio); err != nil {
+		return "", err
+	}
+	_ = writer.WriteField("model", "whisper-large-v3")
+	_ = writer.WriteField("response_format", "json")
+	_ = writer.Close()
+
+	req, err := http.NewRequest(http.MethodPost, "https://api.groq.com/openai/v1/audio/transcriptions", &buf)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+h.Config.GROQ_API_KEY)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	client := &http.Client{Timeout: 90 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Groq API error %d: %s", resp.StatusCode, string(body))
+	}
+
+	var out struct {
+		Text string `json:"text"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out.Text), nil
 }
 
 func (h *AIHandler) buildQuestionPrompt(jobRole, interviewType string, num int) string {

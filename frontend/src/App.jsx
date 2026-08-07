@@ -3,6 +3,7 @@ import api from './api';
 import ResumeUpload from './ResumeUpload';
 import DarkModeToggle from './DarkModeToggle';
 import VoiceRecorder from './VoiceRecorder';
+import { PlayRecording, ReplayConversation } from './PlayRecording';
 
 export default function App() {
   const [screen, setScreen] = useState('login');
@@ -571,14 +572,31 @@ export default function App() {
 
   const voiceStop = () => setStopSignal((s) => s + 1);
 
-  const voiceOnAnswerDone = async (questionId, transcript) => {
+  const voiceOnAnswerDone = async (questionId, transcript, blob) => {
     if (voiceBusyRef.current) return;
     voiceBusyRef.current = true;
     setCountdown(0);
     setEvaluating(true);
     setError('');
     const q = questionsRef.current[currentQIdxRef.current];
-    const answer = (transcript || '').trim();
+    let answer = (transcript || '').trim();
+    let hasRecording = false;
+    if (blob) {
+      const fd = new FormData();
+      fd.append('question_id', q.id);
+      fd.append('audio', blob, 'answer.webm');
+      try {
+        await api.post(`/sessions/${currentSessionRef.current.id}/recordings`, fd);
+        hasRecording = true;
+      } catch (e) { /* recording save failed, continue anyway */ }
+      try {
+        const tfd = new FormData();
+        tfd.append('file', blob, 'answer.webm');
+        const tres = await api.post('/ai/transcribe', tfd);
+        const serverText = ((tres.data && tres.data.text) || '').trim();
+        if (serverText) answer = serverText;
+      } catch (e) { /* fall back to browser transcript */ }
+    }
     setCurrentAnswer(answer);
     if (!answer && retriedForRef.current !== q.id) {
       retriedForRef.current = q.id;
@@ -623,6 +641,7 @@ export default function App() {
         strengths: Array.isArray(fb.strengths) ? fb.strengths.join('; ') : String(fb.strengths || ''),
         improvements: Array.isArray(fb.weaknesses) ? fb.weaknesses.join('; ') : String(fb.weaknesses || ''),
         answer: fb.answer,
+        recording: hasRecording,
       });
       setVoicePhase('feedback');
       const fbText = `For that answer, I gave you a score of ${Math.round(fb.score)} out of 100. ${fb.feedback}`;
@@ -1070,13 +1089,22 @@ export default function App() {
                 <p style={{ color: '#94a3b8', textAlign: 'center', fontSize: '16px' }}>No answers were recorded for this session.</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <ReplayConversation
+                    sessionId={viewSession.id}
+                    items={viewSessionDetail}
+                  />
                   {viewSessionDetail.map((item, idx) => (
                     <div key={idx} style={{ backgroundColor: '#0f172a', padding: '20px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', boxSizing: 'border-box' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
                         <p style={{ fontSize: '14px', fontWeight: '800', color: '#38bdf8', margin: 0, fontFamily: 'monospace' }}>QUESTION {idx + 1}</p>
-                        {item.score != null && (
-                          <span style={{ fontSize: '18px', fontWeight: '900', color: item.score >= 70 ? '#10b981' : item.score >= 40 ? '#eab308' : '#ef4444' }}>{Math.round(item.score)}%</span>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          {item.has_recording && (
+                            <PlayRecording sessionId={viewSession.id} questionId={item.question_id} />
+                          )}
+                          {item.score != null && (
+                            <span style={{ fontSize: '18px', fontWeight: '900', color: item.score >= 70 ? '#10b981' : item.score >= 40 ? '#eab308' : '#ef4444' }}>{Math.round(item.score)}%</span>
+                          )}
+                        </div>
                       </div>
                       <p style={{ fontSize: '15px', fontWeight: '600', color: '#ffffff', margin: '0 0 12px 0', lineHeight: '1.5' }}>{item.question}</p>
 
@@ -1325,11 +1353,22 @@ export default function App() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '28px' }}>
+                {currentSession && evaluations.some((ev) => ev.recording) && (
+                  <ReplayConversation
+                    sessionId={currentSession.id}
+                    items={evaluations}
+                  />
+                )}
                 {results.items.map((e, i) => (
                   <div key={e.question_id} style={{ backgroundColor: '#0f172a', padding: '20px', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', boxSizing: 'border-box' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
                       <p style={{ fontSize: '14px', fontWeight: '800', color: '#38bdf8', margin: 0, fontFamily: 'monospace' }}>QUESTION {i + 1}</p>
-                      <span style={{ fontSize: '18px', fontWeight: '900', color: e.score >= 70 ? '#10b981' : e.score >= 40 ? '#eab308' : '#ef4444' }}>{Math.round(e.score)}%</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {currentSession && evaluations.find((ev) => ev.question_id === e.question_id)?.recording && (
+                          <PlayRecording sessionId={currentSession.id} questionId={e.question_id} />
+                        )}
+                        <span style={{ fontSize: '18px', fontWeight: '900', color: e.score >= 70 ? '#10b981' : e.score >= 40 ? '#eab308' : '#ef4444' }}>{Math.round(e.score)}%</span>
+                      </div>
                     </div>
                     <p style={{ fontSize: '15px', fontWeight: '600', color: '#ffffff', margin: '0 0 10px 0', lineHeight: '1.5' }}>{e.question}</p>
                     {e.feedback && <p style={{ fontSize: '14px', color: '#cbd5e1', margin: 0, lineHeight: '1.6', fontWeight: '500' }}>{e.feedback}</p>}

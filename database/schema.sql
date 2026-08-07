@@ -85,6 +85,14 @@ CREATE TABLE interview_feedback (
     created_at      TIMESTAMP DEFAULT NOW()
 );
 
+-- INTERVIEW RECORDINGS (per-question audio answers for voice interviews)
+CREATE TABLE interview_recordings (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    question_id UUID NOT NULL UNIQUE REFERENCES interview_questions(id) ON DELETE CASCADE,
+    audio       BYTEA NOT NULL,
+    created_at  TIMESTAMP DEFAULT NOW()
+);
+
 -- INDEXES
 CREATE INDEX idx_profiles_user_id ON profiles(user_id);
 CREATE INDEX idx_sessions_user_id ON interview_sessions(user_id);

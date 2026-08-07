@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"io"
 	"net/http"
 	"time"
 
@@ -195,4 +196,97 @@ func (h *InterviewHandler) SubmitAnswers(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Answers submitted"})
+}
+
+// UploadRecording saves a candidate's audio answer for a session question.
+func (h *InterviewHandler) UploadRecording(c *gin.Context) {
+	userID := c.GetString("user_id")
+	sessionID := c.Param("id")
+
+	var sessionStatus string
+	err := database.DB.QueryRow(
+		`SELECT status FROM interview_sessions WHERE id = $1 AND user_id = $2`,
+		sessionID, userID,
+	).Scan(&sessionStatus)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Session not found"})
+		return
+	}
+	if sessionStatus != "in_progress" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Session is not in progress"})
+		return
+	}
+
+	questionID := c.PostForm("question_id")
+	if questionID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing question_id"})
+		return
+	}
+
+	var exists bool
+	_ = database.DB.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM interview_questions WHERE id = $1 AND session_id = $2)`,
+		questionID, sessionID,
+	).Scan(&exists)
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Question not in session"})
+		return
+	}
+
+	fileHeader, err := c.FormFile("audio")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No audio file uploaded"})
+		return
+	}
+	file, err := fileHeader.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open file"})
+		return
+	}
+	defer file.Close()
+
+	audioBytes, err := io.ReadAll(file)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read file"})
+		return
+	}
+	if len(audioBytes) == 0 || len(audioBytes) > 25*1024*1024 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid audio file size"})
+		return
+	}
+
+	_, err = database.DB.Exec(
+		`INSERT INTO interview_recordings (question_id, audio) VALUES ($1, $2)
+		 ON CONFLICT (question_id) DO UPDATE SET audio = EXCLUDED.audio, created_at = NOW()`,
+		questionID, audioBytes,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save recording"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Recording saved"})
+}
+
+// GetRecording streams back a candidate's audio answer for a session question.
+func (h *InterviewHandler) GetRecording(c *gin.Context) {
+	userID := c.GetString("user_id")
+	sessionID := c.Param("id")
+	questionID := c.Param("question_id")
+
+	var audio []byte
+	err := database.DB.QueryRow(
+		`SELECT r.audio
+		 FROM interview_recordings r
+		 JOIN interview_questions q ON q.id = r.question_id
+		 JOIN interview_sessions s ON s.id = q.session_id
+		 WHERE q.id = $1 AND q.session_id = $2 AND s.user_id = $3`,
+		questionID, sessionID, userID,
+	).Scan(&audio)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Recording not found"})
+		return
+	}
+
+	c.Data(http.StatusOK, "audio/webm", audio)
 }
