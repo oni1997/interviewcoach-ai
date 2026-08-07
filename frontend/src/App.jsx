@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from './api';
 import ResumeUpload from './ResumeUpload';
 import DarkModeToggle from './DarkModeToggle';
@@ -39,6 +39,32 @@ export default function App() {
   const [voiceOn, setVoiceOn] = useState(true);
   const [conversationHistory, setConversationHistory] = useState([]);
   const [askingFollowUp, setAskingFollowUp] = useState(false);
+
+  const [voicePhase, setVoicePhase] = useState('question');
+  const [countdown, setCountdown] = useState(60);
+  const [voiceMainIdx, setVoiceMainIdx] = useState(0);
+  const [voiceIsFollowUp, setVoiceIsFollowUp] = useState(false);
+  const [baseQuestionCount, setBaseQuestionCount] = useState(0);
+  const [stopSignal, setStopSignal] = useState(0);
+
+  const questionsRef = useRef([]);
+  const evaluationsRef = useRef([]);
+  const convHistoryRef = useRef([]);
+  const currentQIdxRef = useRef(0);
+  const voiceMainIdxRef = useRef(0);
+  const voiceIsFollowUpRef = useRef(false);
+  const baseCountRef = useRef(0);
+  const voiceBusyRef = useRef(false);
+  const currentSessionRef = useRef(null);
+  const roleRef = useRef('Software Engineer');
+  const typeRef = useRef('');
+
+  useEffect(() => { questionsRef.current = questions; }, [questions]);
+  useEffect(() => { evaluationsRef.current = evaluations; }, [evaluations]);
+  useEffect(() => { convHistoryRef.current = conversationHistory; }, [conversationHistory]);
+  useEffect(() => { currentSessionRef.current = currentSession; }, [currentSession]);
+  useEffect(() => { roleRef.current = role; }, [role]);
+  useEffect(() => { typeRef.current = selectedType; }, [selectedType]);
 
   const [profileForm, setProfileForm] = useState({ headline: '', bio: '', target_role: '', experience_level: '', skills: '' });
   const [isDarkMode, setIsDarkMode] = React.useState(false);
@@ -245,8 +271,11 @@ export default function App() {
     }
   };
 
-  const speak = (text) => {
-    if (!voiceOn || !window.speechSynthesis) return;
+  const speak = (text, onDone) => {
+    if (!text || !voiceOn || !window.speechSynthesis) {
+      if (onDone) onDone();
+      return;
+    }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = 1.0;
@@ -254,6 +283,10 @@ export default function App() {
     const voices = window.speechSynthesis.getVoices();
     if (voices.length > 0) {
       utterance.voice = voices.find((v) => v.lang.startsWith('en')) || voices[0];
+    }
+    if (onDone) {
+      utterance.onend = () => onDone();
+      utterance.onerror = () => onDone();
     }
     window.speechSynthesis.speak(utterance);
   };
@@ -417,6 +450,223 @@ export default function App() {
     setScreen('results');
     fetchDashboardData();
   };
+
+  const addVoiceEval = (item) => {
+    const next = [...evaluationsRef.current, item];
+    evaluationsRef.current = next;
+    setEvaluations(next);
+  };
+
+  const pushVoiceQuestion = (q) => {
+    const next = [...questionsRef.current, q];
+    questionsRef.current = next;
+    setQuestions(next);
+  };
+
+  const startVoiceInterview = async () => {
+    setSelectedType('behavioral');
+    setError('');
+    setStopSignal(0);
+    setVoicePhase('question');
+    setCountdown(60);
+    setVoiceMainIdx(0);
+    setVoiceMainIdxRef(0);
+    setVoiceIsFollowUp(false);
+    setVoiceIsFollowUpRef(false);
+    setEvaluations([]);
+    evaluationsRef.current = [];
+    convHistoryRef.current = [];
+    setConversationHistory([]);
+    setResults(null);
+    setCurrentSession(null);
+    setAiFeedback(null);
+    setCurrentAnswer('');
+    try {
+      const res = await api.post('/sessions', { interview_type: 'behavioral' });
+      setCurrentSession(res.data);
+      currentSessionRef.current = res.data;
+      const sampleQuestions = [
+        'Tell me about a time you faced a conflict with a teammate.',
+        'How do you handle tight deadlines and pressure?',
+        'Describe a situation where you had to adapt to change quickly.',
+      ];
+      await api.post(`/sessions/${res.data.id}/questions`, { questions: sampleQuestions });
+      const sessionRes = await api.get(`/sessions/${res.data.id}`);
+      const qs = sessionRes.data.questions || [];
+      questionsRef.current = qs;
+      setQuestions(qs);
+      baseCountRef.current = qs.length;
+      setBaseQuestionCount(qs.length);
+      currentQIdxRef.current = 0;
+      setCurrentQIndex(0);
+      setCurrentAttempt(1);
+      convHistoryRef.current = [];
+      setConversationHistory([]);
+      setScreen('voice-interview');
+      voiceAskMain(0);
+    } catch (err) {
+      setError('Failed to start voice session');
+      setTimeout(() => setError(''), 2500);
+    }
+  };
+
+  const voiceAskMain = (idx) => {
+    voiceMainIdxRef.current = idx;
+    voiceIsFollowUpRef.current = false;
+    setVoiceIsFollowUp(false);
+    currentQIdxRef.current = idx;
+    setCurrentQIndex(idx);
+    setCurrentAnswer('');
+    setVoicePhase('question');
+    setCountdown(60);
+    const q = questionsRef.current[idx];
+    if (!q) {
+      voiceFinish();
+      return;
+    }
+    speak(`Question ${idx + 1}. ${q.question_text}`, () => voiceBeginAnswer());
+  };
+
+  const voiceBeginAnswer = () => {
+    setVoicePhase('answer');
+    setCountdown(60);
+  };
+
+  const voiceStop = () => setStopSignal((s) => s + 1);
+
+  const voiceOnAnswerDone = async (questionId, transcript) => {
+    if (voiceBusyRef.current) return;
+    voiceBusyRef.current = true;
+    setCountdown(0);
+    setEvaluating(true);
+    setError('');
+    const q = questionsRef.current[currentQIdxRef.current];
+    const answer = (transcript || '').trim();
+    setCurrentAnswer(answer);
+    try {
+      let fb;
+      if (!answer) {
+        fb = {
+          score: 0,
+          feedback: 'No answer was recorded.',
+          strengths: [],
+          weaknesses: ['No response was given'],
+          answer: '',
+        };
+      } else {
+        const res = await api.post('/ai/evaluate', {
+          question: q.question_text,
+          answer,
+          role: roleRef.current,
+        });
+        fb = {
+          score: Number(res.data.score) || 0,
+          feedback: res.data.feedback || 'No feedback provided.',
+          strengths: Array.isArray(res.data.strengths) ? res.data.strengths : [],
+          weaknesses: Array.isArray(res.data.weaknesses) ? res.data.weaknesses : [],
+          answer,
+        };
+      }
+
+      addVoiceEval({
+        question_id: q.id,
+        question: q.question_text,
+        score: fb.score,
+        feedback: fb.feedback,
+        strengths: Array.isArray(fb.strengths) ? fb.strengths.join('; ') : String(fb.strengths || ''),
+        improvements: Array.isArray(fb.weaknesses) ? fb.weaknesses.join('; ') : String(fb.weaknesses || ''),
+        answer: fb.answer,
+      });
+      setVoicePhase('feedback');
+      const fbText = `For that answer, I gave you a score of ${Math.round(fb.score)} out of 100. ${fb.feedback}`;
+
+      if (voiceIsFollowUpRef.current) {
+        speak(fbText, () => {
+          voiceBusyRef.current = false;
+          voiceAdvanceMain();
+        });
+      } else {
+        let fupText = '';
+        try {
+          const fupRes = await api.post('/ai/follow-up', {
+            question: q.question_text,
+            answer: fb.answer,
+            job_role: roleRef.current,
+            interview_type: typeRef.current || 'behavioral',
+            session_id: currentSessionRef.current.id,
+            history: convHistoryRef.current,
+          });
+          fupText = fupRes.data.question;
+          if (fupRes.data.question_id) {
+            pushVoiceQuestion({
+              id: fupRes.data.question_id,
+              question_text: fupText,
+              question_order: questionsRef.current.length + 1,
+            });
+            currentQIdxRef.current = questionsRef.current.length - 1;
+            setCurrentQIndex(currentQIdxRef.current);
+          }
+        } catch (err) {
+          fupText = '';
+        }
+        convHistoryRef.current = [...convHistoryRef.current, { question: q.question_text, answer: fb.answer }];
+        setConversationHistory(convHistoryRef.current);
+        voiceIsFollowUpRef.current = true;
+        setVoiceIsFollowUp(true);
+        setCurrentAnswer('');
+        if (fupText) {
+          speak(`${fbText}. ${fupText}`, () => {
+            voiceBusyRef.current = false;
+            voiceBeginAnswer();
+          });
+        } else {
+          speak(fbText, () => {
+            voiceBusyRef.current = false;
+            voiceAdvanceMain();
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Voice evaluation failed:', err);
+      setError('AI evaluation failed. Moving on.');
+      setTimeout(() => setError(''), 2500);
+      voiceBusyRef.current = false;
+      voiceAdvanceMain();
+    } finally {
+      setEvaluating(false);
+    }
+  };
+
+  const voiceAdvanceMain = () => {
+    const next = voiceMainIdxRef.current + 1;
+    if (next < baseCountRef.current) {
+      voiceAskMain(next);
+    } else {
+      voiceFinish();
+    }
+  };
+
+  const voiceFinish = () => {
+    setVoicePhase('summary');
+    stopSpeaking();
+    speak('Interview complete. Thank you. Calculating your results now.');
+    finishInterview(evaluationsRef.current);
+  };
+
+  useEffect(() => {
+    if (screen !== 'voice-interview' || voicePhase !== 'answer') return;
+    setCountdown(60);
+    const iv = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(iv);
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [screen, voicePhase]);
 
   const restartInterview = () => {
     setResults(null);
@@ -644,7 +894,7 @@ export default function App() {
                 <div style={{ marginTop: '32px', textAlign: 'center', fontSize: '14px', fontWeight: '900', color: '#ffffff', backgroundColor: '#06b6d4', padding: '12px', borderRadius: '10px', fontFamily: 'monospace', border: '1px solid rgba(255,255,255,0.4)' }}>START SESSION →</div>
               </div>
 
-              <div onClick={() => startInterview('behavioral')} style={{ backgroundColor: '#0f172a', padding: '32px', borderRadius: '20px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', cursor: 'pointer', transition: 'transform 0.2s' }}>
+              <div onClick={startVoiceInterview} style={{ backgroundColor: '#0f172a', padding: '32px', borderRadius: '20px', border: '2px solid rgba(255,255,255,0.25)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 10px 20px rgba(0,0,0,0.3)', cursor: 'pointer', transition: 'transform 0.2s' }}>
                 <div>
                   <h4 style={{ fontWeight: '900', color: '#ffffff', fontSize: '20px', margin: '0 0 10px 0' }}>Vocal AI Simulation</h4>
                   <p style={{ fontSize: '15px', color: '#e2e8f0', margin: 0, lineHeight: '1.6', fontWeight: '500' }}>Speech-to-text validation engines analyzing cadence and presentation timelines. Answer questions using your voice.</p>
@@ -917,6 +1167,81 @@ export default function App() {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {screen === 'voice-interview' && (
+          <div style={{ width: '100%', maxWidth: '900px', boxSizing: 'border-box' }}>
+            <div className="app-card-box dark:bg-slate-900/95 dark:border-white/50 dark:shadow-[0_25px_60px_rgba(0,0,0,0.8),0_0_25px_rgba(168,85,247,0.2)]" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(20px)', padding: 'clamp(20px, 4vw, 40px)', borderRadius: '28px', border: '2px solid rgba(255, 255, 255, 0.4)', boxShadow: '0 25px 50px rgba(0,0,0,0.6)', width: '100%', boxSizing: 'border-box' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '8px' }}>
+                <h2 style={{ fontSize: '28px', fontWeight: '900', color: '#ffffff', margin: 0 }}>Vocal AI Interview</h2>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button onClick={() => { setVoiceOn((v) => !v); stopSpeaking(); }} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: voiceOn ? 'rgba(16, 185, 129, 0.2)' : '#334155', color: '#ffffff', fontWeight: '700', padding: '8px 14px', borderRadius: '10px', border: `1px solid ${voiceOn ? 'rgba(16, 185, 129, 0.6)' : 'rgba(255,255,255,0.3)'}`, cursor: 'pointer', fontSize: '13px' }}>
+                    {voiceOn ? 'Voice On' : 'Voice Off'}
+                  </button>
+                  <button onClick={() => { stopSpeaking(); setScreen('dashboard'); setCurrentSession(null); setQuestions([]); setConversationHistory([]); }} style={{ backgroundColor: '#64748b', color: '#ffffff', fontWeight: '800', padding: '8px 14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '13px' }}>Quit</button>
+                </div>
+              </div>
+              <p style={{ fontSize: '15px', color: '#cbd5e1', margin: '0 0 20px 0' }}>
+                The AI reads each question aloud. You get <span style={{ color: '#eab308', fontWeight: '900' }}>1 minute</span> to answer out loud — no typing needed.
+              </p>
+              {error && <div style={{ backgroundColor: '#f43f5e', border: '1px solid #ffffff', color: '#ffffff', padding: '14px', borderRadius: '12px', fontSize: '14px', marginBottom: '20px', fontWeight: '700' }}>{error}</div>}
+
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '28px' }}>
+                {Array.from({ length: baseQuestionCount }).map((_, idx) => (
+                  <div key={idx} style={{ flex: 1, height: '8px', borderRadius: '6px', backgroundColor: idx < voiceMainIdx ? '#06b6d4' : idx === voiceMainIdx ? '#38bdf8' : 'rgba(255,255,255,0.15)' }} />
+                ))}
+              </div>
+
+              <div style={{ backgroundColor: '#0f172a', padding: 'clamp(20px, 4vw, 32px)', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.25)', boxSizing: 'border-box', textAlign: 'center' }}>
+                {questions[currentQIndex] && (
+                  <p style={{ fontSize: '17px', fontWeight: '600', color: '#ffffff', margin: '0 0 20px 0', lineHeight: '1.5' }}>{questions[currentQIndex].question_text}</p>
+                )}
+
+                {voicePhase === 'question' && (
+                  <div>
+                    <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#38bdf8', animation: 'pulse 1s infinite', marginBottom: '12px' }} />
+                    <style>{`@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }`}</style>
+                    <p style={{ color: '#94a3b8', fontSize: '15px', fontWeight: '600', margin: 0 }}>The AI is reading the question — listen carefully...</p>
+                  </div>
+                )}
+
+                {voicePhase === 'answer' && (
+                  <div>
+                    <div style={{ width: '150px', height: '150px', borderRadius: '50%', border: `8px solid ${countdown > 15 ? '#10b981' : '#ef4444'}`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#1e293b', margin: '0 0 14px 0', boxShadow: countdown <= 15 ? '0 0 20px rgba(239,68,68,0.4)' : '0 0 20px rgba(16,185,129,0.25)' }}>
+                      <span style={{ fontSize: '42px', fontWeight: '900', color: '#ffffff', fontFamily: 'monospace' }}>0:{String(countdown).padStart(2, '0')}</span>
+                    </div>
+                    <p style={{ color: '#38bdf8', fontSize: '16px', fontWeight: '800', margin: '0 0 6px 0' }}>Your turn — speak your answer</p>
+                    <p style={{ color: '#94a3b8', fontSize: '14px', margin: '0 0 8px 0', fontWeight: '500' }}>
+                      {currentAnswer ? `Heard: "${currentAnswer}"` : 'Listening...'}
+                    </p>
+                    <VoiceRecorder
+                      key={questions[currentQIndex]?.id}
+                      questionId={questions[currentQIndex]?.id}
+                      onTranscript={handleTranscript}
+                      autoStart
+                      durationSeconds={60}
+                      onDone={voiceOnAnswerDone}
+                      stopSignal={stopSignal}
+                    />
+                    <div style={{ marginTop: '16px' }}>
+                      <button onClick={voiceStop} style={{ backgroundColor: '#ef4444', color: '#ffffff', fontWeight: '800', padding: '14px 30px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.4)', cursor: 'pointer', fontSize: '15px', boxShadow: '0 6px 18px rgba(239,68,68,0.4)' }}>Stop &amp; Continue</button>
+                    </div>
+                  </div>
+                )}
+
+                {voicePhase === 'feedback' && (
+                  <div>
+                    <span style={{ display: 'inline-block', width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#8b5cf6', animation: 'pulse 1s infinite', marginBottom: '12px' }} />
+                    <p style={{ color: '#94a3b8', fontSize: '15px', fontWeight: '600', margin: 0 }}>The AI is reviewing your answer and preparing the next question...</p>
+                  </div>
+                )}
+
+                {voicePhase === 'summary' && (
+                  <p style={{ color: '#eab308', fontSize: '16px', fontWeight: '800', margin: 0 }}>Interview complete — calculating your results...</p>
+                )}
+              </div>
             </div>
           </div>
         )}
