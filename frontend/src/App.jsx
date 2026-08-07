@@ -286,6 +286,7 @@ export default function App() {
         answer,
         job_role: role,
         interview_type: selectedType,
+        session_id: currentSession.id,
         history: conversationHistory,
       });
       const followUp = res.data.question;
@@ -294,7 +295,7 @@ export default function App() {
       const historyTurn = { question: q.question_text, answer };
       setConversationHistory([...conversationHistory, historyTurn]);
 
-      const newQuestion = { id: `followup-${Date.now()}`, question_text: followUp, question_order: questions.length + 1 };
+      const newQuestion = { id: res.data.question_id || `followup-${Date.now()}`, question_text: followUp, question_order: questions.length + 1 };
       setQuestions([...questions, newQuestion]);
       setCurrentQIndex(questions.length);
       setCurrentAnswer('');

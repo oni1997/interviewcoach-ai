@@ -49,16 +49,18 @@ type SaveEvaluationRequest struct {
 }
 
 type FollowUpRequest struct {
-	Question      string            `json:"question" binding:"required"`
-	Answer        string            `json:"answer" binding:"required"`
-	JobRole       string            `json:"job_role"`
-	InterviewType string            `json:"interview_type"`
+	Question      string              `json:"question" binding:"required"`
+	Answer        string              `json:"answer" binding:"required"`
+	JobRole       string              `json:"job_role"`
+	InterviewType string              `json:"interview_type"`
+	SessionID     string              `json:"session_id"`
 	History       []services.ChatTurn `json:"history"`
 }
 
 type FollowUpResponse struct {
-	Question string `json:"question"`
-	Source   string `json:"source"`
+	Question   string `json:"question"`
+	QuestionID string `json:"question_id"`
+	Source     string `json:"source"`
 }
 
 func (h *AIHandler) hasGemini() bool {
@@ -155,9 +157,43 @@ func (h *AIHandler) GenerateQuestions(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"questions": h.fallbackQuestions(role, interviewType, count), "source": "fallback"})
 }
 
+// generateFollowUp runs the fallback chain and returns the follow-up question
+// text and which provider produced it.
+func (h *AIHandler) generateFollowUp(req FollowUpRequest, role, interviewType string) (string, string, error) {
+	// 1) Gemini
+	if h.hasGemini() {
+		q, err := h.followUpWithGemini(req, role, interviewType)
+		if err == nil {
+			return q, "gemini", nil
+		}
+		fmt.Printf("⚠️  Gemini follow-up failed, falling back: %v\n", err)
+	}
+
+	// 2) OpenAI
+	if h.hasOpenAI() {
+		q, err := h.followUpWithOpenAI(req, role, interviewType)
+		if err == nil {
+			return q, "openai", nil
+		}
+		fmt.Printf("⚠️  OpenAI follow-up failed, falling back: %v\n", err)
+	}
+
+	// 3) NVIDIA
+	if h.hasNVIDIA() {
+		q, err := h.followUpWithNVIDIA(req, role, interviewType)
+		if err == nil {
+			return q, "nvidia", nil
+		}
+		fmt.Printf("⚠️  NVIDIA follow-up failed, falling back: %v\n", err)
+	}
+
+	// 4) Local fallback
+	return h.fallbackFollowUp(req.Question, req.Answer), "fallback", nil
+}
+
 // FollowUpQuestion generates a conversational follow-up question based on the
-// candidate's previous answer. It supports Gemini, OpenAI, NVIDIA, and a local
-// fallback so the conversational mode works without any API key.
+// candidate's previous answer, persists it as a real session question (when a
+// session_id is supplied), and returns the new question and its DB id.
 func (h *AIHandler) FollowUpQuestion(c *gin.Context) {
 	var req FollowUpRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -174,41 +210,42 @@ func (h *AIHandler) FollowUpQuestion(c *gin.Context) {
 		interviewType = "behavioral"
 	}
 
-	// 1) Gemini
-	if h.hasGemini() {
-		q, err := h.followUpWithGemini(req, role, interviewType)
-		if err == nil {
-			c.JSON(http.StatusOK, FollowUpResponse{Question: q, Source: "gemini"})
-			return
+	q, source, _ := h.generateFollowUp(req, role, interviewType)
+
+	resp := FollowUpResponse{Question: q, Source: source}
+	if req.SessionID != "" {
+		if id, err := h.persistFollowUpQuestion(c.GetString("user_id"), req.SessionID, q); err == nil && id != "" {
+			resp.QuestionID = id
 		}
-		fmt.Printf("⚠️  Gemini follow-up failed, falling back: %v\n", err)
 	}
 
-	// 2) OpenAI
-	if h.hasOpenAI() {
-		q, err := h.followUpWithOpenAI(req, role, interviewType)
-		if err == nil {
-			c.JSON(http.StatusOK, FollowUpResponse{Question: q, Source: "openai"})
-			return
-		}
-		fmt.Printf("⚠️  OpenAI follow-up failed, falling back: %v\n", err)
+	c.JSON(http.StatusOK, resp)
+}
+
+// persistFollowUpQuestion appends the generated follow-up as a real question in
+// the candidate's session so answers/scores persist into their history.
+func (h *AIHandler) persistFollowUpQuestion(userID, sessionID, question string) (string, error) {
+	var ownerID, status string
+	if err := database.DB.QueryRow(
+		`SELECT user_id, status FROM interview_sessions WHERE id = $1 AND user_id = $2`,
+		sessionID, userID,
+	).Scan(&ownerID, &status); err != nil {
+		return "", err
+	}
+	if status != "in_progress" {
+		return "", fmt.Errorf("session is not in progress")
 	}
 
-	// 3) NVIDIA
-	if h.hasNVIDIA() {
-		q, err := h.followUpWithNVIDIA(req, role, interviewType)
-		if err == nil {
-			c.JSON(http.StatusOK, FollowUpResponse{Question: q, Source: "nvidia"})
-			return
-		}
-		fmt.Printf("⚠️  NVIDIA follow-up failed, falling back: %v\n", err)
+	var id string
+	if err := database.DB.QueryRow(
+		`INSERT INTO interview_questions (session_id, question_text, question_order)
+		 VALUES ($1, $2, (SELECT COALESCE(MAX(question_order), 0) + 1 FROM interview_questions WHERE session_id = $1))
+		 RETURNING id`,
+		sessionID, question,
+	).Scan(&id); err != nil {
+		return "", err
 	}
-
-	// 4) Local fallback
-	c.JSON(http.StatusOK, FollowUpResponse{
-		Question: h.fallbackFollowUp(req.Question, req.Answer),
-		Source:   "fallback",
-	})
+	return id, nil
 }
 
 func (h *AIHandler) followUpPrompt(req FollowUpRequest, role, interviewType string) string {
