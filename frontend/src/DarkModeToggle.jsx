@@ -33,11 +33,11 @@ export default function DarkModeToggle() {
     >
       {isDarkMode ? (
         <>
-          <span>☀️</span> Light
+          <span style={{ fontSize: '25px', lineHeight: 1 }}>☀️</span>
         </>
       ) : (
         <>
-          <span>🌒</span> Dark
+          <span style={{ fontSize: '25px', lineHeight: 1 }}>🌒</span>
         </>
       )}
     </button>
