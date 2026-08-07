@@ -464,6 +464,41 @@ export default function App() {
     setQuestions(next);
   };
 
+  const fetchVoiceQuestions = async (type, count) => {
+    try {
+      const r = await api.post('/ai/generate-questions', {
+        job_role: roleRef.current,
+        interview_type: type,
+        count,
+      });
+      const qs = r.data && r.data.questions;
+      if (Array.isArray(qs) && qs.length) return qs.slice(0, count);
+    } catch (err) { /* fall through to empty */ }
+    return [];
+  };
+
+  const buildVoiceQuestions = async () => {
+    const [beh, tech] = await Promise.all([
+      fetchVoiceQuestions('behavioral', 3),
+      fetchVoiceQuestions('technical', 3),
+    ]);
+    const mixed = [];
+    const n = Math.max(beh.length, tech.length);
+    for (let i = 0; i < n; i++) {
+      if (beh[i]) mixed.push(beh[i]);
+      if (tech[i]) mixed.push(tech[i]);
+    }
+    if (mixed.length >= 4) return mixed;
+    return [
+      'Tell me about a time you faced a conflict with a teammate.',
+      'How do you handle tight deadlines and pressure?',
+      'Describe a situation where you had to adapt to change quickly.',
+      'Walk me through a complex project you worked on and your role in it.',
+      'How do you approach debugging a difficult issue?',
+      'Describe your experience with system design and architecture.',
+    ];
+  };
+
   const startVoiceInterview = async () => {
     setSelectedType('behavioral');
     setError('');
@@ -491,12 +526,8 @@ export default function App() {
       const res = await api.post('/sessions', { interview_type: 'behavioral' });
       setCurrentSession(res.data);
       currentSessionRef.current = res.data;
-      const sampleQuestions = [
-        'Tell me about a time you faced a conflict with a teammate.',
-        'How do you handle tight deadlines and pressure?',
-        'Describe a situation where you had to adapt to change quickly.',
-      ];
-      await api.post(`/sessions/${res.data.id}/questions`, { questions: sampleQuestions });
+      const voiceQuestions = await buildVoiceQuestions();
+      await api.post(`/sessions/${res.data.id}/questions`, { questions: voiceQuestions });
       const sessionRes = await api.get(`/sessions/${res.data.id}`);
       const qs = sessionRes.data.questions || [];
       questionsRef.current = qs;
