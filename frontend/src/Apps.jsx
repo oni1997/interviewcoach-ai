@@ -5,11 +5,10 @@ import Navbar from "./components/Navbar";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Logout from "./pages/Logout";
+import ForgotPassword from "./pages/ForgotPassword";
 
 function App() {
-
   return (
-
     <BrowserRouter>
 
       <Navbar />
@@ -36,10 +35,14 @@ function App() {
           element={<Logout />}
         />
 
+        <Route
+          path="/forgot-password"
+          element={<ForgotPassword />}
+        />
+
       </Routes>
 
     </BrowserRouter>
-
   );
 }
 

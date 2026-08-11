@@ -122,3 +122,38 @@ body {
 .auth-card a:hover {
     text-decoration: underline;
 }
+
+/* Forgot Password */
+.forgot-password {
+    text-align: right;
+    margin-bottom: 15px;
+}
+
+.forgot-password a {
+    color: #2563eb;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.forgot-password a:hover {
+    text-decoration: underline;
+}
+
+/* Password Strength */
+.password-strength {
+    font-size: 14px;
+    margin-top: -10px;
+    margin-bottom: 15px;
+}
+
+.password-strength.weak {
+    color: #dc2626;
+}
+
+.password-strength.medium {
+    color: #f59e0b;
+}
+
+.password-strength.strong {
+    color: #16a34a;
+}

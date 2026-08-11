@@ -1,5 +1,7 @@
+
 import { useState } from "react";
-import "../styles/Auth.css";
+import { Link } from "react-router-dom";
+import "../style/Auth.css";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -8,50 +10,56 @@ function Login() {
   const handleLogin = (e) => {
     e.preventDefault();
 
-    console.log("Login");
-    console.log({
+    console.log("Login:", {
       email,
       password,
     });
   };
 
   return (
-    <div className="container mt-5">
-      <h2>Login</h2>
+    <div className="auth-container">
+      <div className="auth-card">
+        <h2>Login to InterviewCoach AI</h2>
 
-      <form onSubmit={handleLogin}>
-<div className="auth-container">
-    <div className="auth-card">
-        <div className="mb-3">
+        <form onSubmit={handleLogin}>
           <label>Email</label>
 
           <input
             type="email"
-            className="form-control"
-            placeholder="Enter Email"
+            placeholder="Enter your email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            required
           />
-        </div>
 
-        <div className="mb-3">
           <label>Password</label>
 
           <input
             type="password"
-            className="form-control"
-            placeholder="Enter Password"
+            placeholder="Enter your password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            required
           />
-        </div>
 
-        <button className="btn btn-primary">
-          Login
-        </button>
-    </div>
-</div>
-      </form>
+          <div className="forgot-password">
+            <Link to="/forgot-password">
+              Forgot Password?
+            </Link>
+          </div>
+
+          <button type="submit">
+            Login
+          </button>
+        </form>
+
+        <p>
+          Don't have an account?{" "}
+          <Link to="/register">
+            Register
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
